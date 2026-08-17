@@ -1,0 +1,6 @@
+# dsh-skill-mcp-center bundle patch: one insert over the profile root.
+# Host half reads ctx.skills (skill catalog) + ctx.loader/ctx.tools (MCP);
+# client half registers a Settings section plus an optional sidebar MCP tab.
+- insert:
+    - id: skill-mcp-center
+      name: '@max-null/dsh-skill-mcp-center'
