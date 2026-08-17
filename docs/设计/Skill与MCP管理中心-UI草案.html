@@ -1,0 +1,449 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Skill &amp; MCP 管理中心 — UI 草案</title>
+<style>
+  /* =====================================================================
+     下面这段「:root / [data-theme=dark] 定义 --dsw-* token」只是为了让
+     独立 demo 能渲染 —— 真实实现里这些 token 由 ui-theme 的
+     design-platform.css 提供，组件【绝不】自己定义或硬编码颜色，
+     只用 var(--dsw-*)。皮肤插件覆盖这些 token 时颜色自动跟随。
+     ===================================================================== */
+  :root {
+    --dsw-alias-bg-base: #ffffff;
+    --dsw-alias-bg-layer-1: #ffffff;
+    --dsw-alias-bg-layer-2: #f5f6f7;
+    --dsw-alias-bg-module-platform: #f5f6f7;
+    --dsw-alias-bg-mask-1: rgba(0,0,0,0.24);
+    --dsw-alias-border-l1: rgba(0,0,0,0.04);
+    --dsw-alias-border-l2: rgba(0,0,0,0.10);
+    --dsw-alias-border-l3: rgba(0,0,0,0.14);
+    --dsw-alias-label-primary: #0f1115;
+    --dsw-alias-label-secondary: #616667;
+    --dsw-alias-label-tertiary: #81858c;
+    --dsw-alias-label-caption: #adb2b8;
+    --dsw-alias-brand-primary: #0f1115;
+    --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
+    --dsw-alias-button-primary-hover: #2c2c2e;
+    --dsw-alias-state-business-primary: #4176e6;
+    --dsw-alias-state-business-tertiary: #e4edfd;
+    --dsw-alias-state-error-primary: #ec1313;
+    --dsw-alias-state-success-primary: #22c55e;
+    --dsw-alias-state-success-tertiary: #e6faed;
+    --dsw-alias-state-warn-primary: #f59e0b;
+    --dsw-alias-state-warn-tertiary: #fef5e7;
+    --dsw-alias-interactive-bg-hover: rgba(38,49,72,0.06);
+    --dsw-alias-interactive-bg-active: rgba(38,49,72,0.10);
+    --dsw-specific-sidebar-fill: #f9fafb;
+  }
+  [data-theme="dark"] {
+    --dsw-alias-bg-base: #151517;
+    --dsw-alias-bg-layer-1: #232324;
+    --dsw-alias-bg-layer-2: #2c2c2e;
+    --dsw-alias-bg-module-platform: #353638;
+    --dsw-alias-bg-mask-1: rgba(0,0,0,0.5);
+    --dsw-alias-border-l1: rgba(255,255,255,0.06);
+    --dsw-alias-border-l2: rgba(255,255,255,0.12);
+    --dsw-alias-border-l3: rgba(255,255,255,0.18);
+    --dsw-alias-label-primary: #f9fafb;
+    --dsw-alias-label-secondary: #cfd3d6;
+    --dsw-alias-label-tertiary: #adb2b8;
+    --dsw-alias-label-caption: #81858c;
+    --dsw-alias-brand-primary: #f9fafb;
+    --dsw-alias-button-primary-fill: var(--dsw-alias-brand-primary);
+    --dsw-alias-button-primary-hover: #cfd3d6;
+    --dsw-alias-state-business-primary: #679efe;
+    --dsw-alias-state-business-tertiary: #18212f;
+    --dsw-alias-state-error-primary: #f25a5a;
+    --dsw-alias-state-success-primary: #22c55e;
+    --dsw-alias-state-success-tertiary: #1b2a20;
+    --dsw-alias-state-warn-primary: #f59e0b;
+    --dsw-alias-state-warn-tertiary: #33270f;
+    --dsw-alias-interactive-bg-hover: rgba(255,255,255,0.08);
+    --dsw-alias-interactive-bg-active: rgba(255,255,255,0.14);
+    --dsw-specific-sidebar-fill: #1b1b1c;
+  }
+
+  /* =====================================================================
+     组件样式：从这里开始【只允许 var(--dsw-*)】，无任何字面量颜色。
+     ===================================================================== */
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body {
+    font-family: -apple-system, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+    font-size:14px; line-height:22px; color:var(--dsw-alias-label-primary);
+    background:var(--dsw-alias-bg-base);
+    -webkit-font-smoothing:antialiased;
+  }
+  button, input, select, textarea { font:inherit; color:inherit; }
+
+  .demo-toolbar {
+    display:flex; align-items:center; gap:12px; padding:10px 20px;
+    border-bottom:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-base);
+    position:sticky; top:0; z-index:10;
+  }
+  .demo-toolbar .title { font-weight:600; }
+  .demo-toolbar .hint { font-size:12px; color:var(--dsw-alias-label-tertiary); }
+  .theme-toggle {
+    margin-left:auto; height:28px; padding:0 12px; border-radius:8px;
+    border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-module-platform);
+    cursor:pointer;
+  }
+  .theme-toggle:hover { background:var(--dsw-alias-interactive-bg-hover); }
+
+  .app { display:flex; height:calc(100vh - 49px); min-height:520px; }
+
+  /* ---- 设置面板（左） ---- */
+  .settings { flex:1; min-width:0; display:flex; }
+  .nav {
+    width:200px; flex:none; border-right:1px solid var(--dsw-alias-border-l2);
+    background:var(--dsw-specific-sidebar-fill); padding:16px 8px;
+  }
+  .nav-item { padding:8px 12px; border-radius:8px; cursor:pointer; color:var(--dsw-alias-label-secondary); }
+  .nav-item:hover { background:var(--dsw-alias-interactive-bg-hover); }
+  .nav-item.active { background:var(--dsw-alias-interactive-bg-active); color:var(--dsw-alias-label-primary); font-weight:600; }
+
+  .content { flex:1; min-width:0; overflow-y:auto; padding:24px 28px; }
+  .page-title { font-size:18px; font-weight:600; margin-bottom:4px; }
+  .page-sub { font-size:13px; color:var(--dsw-alias-label-tertiary); margin-bottom:16px; }
+
+  .tabs { display:flex; gap:4px; border-bottom:1px solid var(--dsw-alias-border-l2); margin-bottom:16px; }
+  .tab {
+    padding:8px 16px; cursor:pointer; background:none; border:none;
+    color:var(--dsw-alias-label-tertiary); border-bottom:2px solid transparent; margin-bottom:-1px;
+  }
+  .tab:hover { color:var(--dsw-alias-label-secondary); }
+  .tab.active { color:var(--dsw-alias-label-primary); border-bottom-color:var(--dsw-alias-state-business-primary); }
+
+  /* ---- 卡片 ---- */
+  .card {
+    border:1px solid var(--dsw-alias-border-l2); border-radius:10px; padding:14px 16px;
+    margin-bottom:10px; background:var(--dsw-alias-bg-layer-1);
+  }
+  .card-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .name { font-weight:600; }
+  .desc { color:var(--dsw-alias-label-secondary); font-size:13px; margin-top:4px; }
+  .meta { display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-top:10px; }
+  .spacer { flex:1; }
+
+  .badge {
+    display:inline-flex; align-items:center; height:20px; padding:0 8px;
+    border-radius:6px; font-size:12px; line-height:1;
+    background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-secondary);
+  }
+  .badge.system { background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-tertiary); }
+  .badge.user { background:var(--dsw-alias-state-business-tertiary); color:var(--dsw-alias-state-business-primary); }
+  .badge.workspace { background:var(--dsw-alias-state-success-tertiary); color:var(--dsw-alias-state-success-primary); }
+  .badge.preset { background:var(--dsw-alias-state-warn-tertiary); color:var(--dsw-alias-state-warn-primary); }
+  .badge.runtime { background:var(--dsw-alias-state-business-tertiary); color:var(--dsw-alias-label-secondary); }
+  .badge.stdio { background:var(--dsw-alias-bg-module-platform); color:var(--dsw-alias-label-secondary); }
+  .badge.http { background:var(--dsw-alias-state-business-tertiary); color:var(--dsw-alias-state-business-primary); }
+
+  .btn {
+    height:26px; padding:0 10px; border-radius:8px; cursor:pointer; font-size:12px;
+    border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-module-platform);
+    color:var(--dsw-alias-label-primary);
+  }
+  .btn:hover { background:var(--dsw-alias-interactive-bg-hover); }
+  .btn.primary { border:none; background:var(--dsw-alias-button-primary-fill); color:var(--dsw-alias-bg-base); }
+  .btn.primary:hover { background:var(--dsw-alias-button-primary-hover); }
+  .btn:disabled { opacity:0.45; cursor:default; }
+  .btn.danger { border-color:var(--dsw-alias-state-error-primary); color:var(--dsw-alias-state-error-primary); background:none; }
+  .btn.danger:hover { background:var(--dsw-alias-interactive-bg-hover); }
+
+  .dot { flex:none; width:8px; height:8px; border-radius:50%; background:var(--dsw-alias-state-success-primary); }
+  .dot.idle { background:var(--dsw-alias-label-caption); }
+  .dot.failed { background:var(--dsw-alias-state-error-primary); }
+
+  /* ---- MCP 表单 ---- */
+  .form {
+    border:1px solid var(--dsw-alias-border-l2); border-radius:10px; padding:16px;
+    margin-bottom:14px; background:var(--dsw-alias-bg-layer-2);
+  }
+  .form-row { display:flex; flex-direction:column; gap:4px; margin-bottom:12px; }
+  .form-label { font-size:12px; color:var(--dsw-alias-label-tertiary); }
+  .form input, .form textarea {
+    height:30px; padding:0 10px; border-radius:8px; font-size:13px;
+    border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-base);
+    outline:none;
+  }
+  .form input:focus { border-color:var(--dsw-alias-state-business-primary); }
+  .form textarea { height:auto; padding:8px 10px; resize:vertical; }
+  .seg { display:flex; gap:6px; }
+  .seg button {
+    flex:1; height:30px; border-radius:8px; cursor:pointer; font-size:13px;
+    border:1px solid var(--dsw-alias-border-l2); background:var(--dsw-alias-bg-base);
+    color:var(--dsw-alias-label-secondary);
+  }
+  .seg button.active { border-color:var(--dsw-alias-state-business-primary); color:var(--dsw-alias-state-business-primary); }
+  .form-error { font-size:12px; color:var(--dsw-alias-state-error-primary); }
+
+  .empty { padding:36px; text-align:center; color:var(--dsw-alias-label-tertiary); font-size:13px; }
+
+  /* ---- 右侧边栏 ---- */
+  .sidebar {
+    width:260px; flex:none; border-left:1px solid var(--dsw-alias-border-l2);
+    background:var(--dsw-specific-sidebar-fill); display:flex; flex-direction:column;
+  }
+  .sidebar-head {
+    padding:14px 16px 10px; font-weight:600; font-size:13px;
+    border-bottom:1px solid var(--dsw-alias-border-l1);
+    display:flex; align-items:center; gap:6px;
+  }
+  .sidebar-head .hint { font-weight:400; font-size:11px; color:var(--dsw-alias-label-caption); margin-left:auto; }
+  .sidebar-body { flex:1; overflow-y:auto; padding:8px; }
+  .srv {
+    display:flex; align-items:center; gap:8px; padding:10px 12px; border-radius:8px;
+    cursor:default;
+  }
+  .srv:hover { background:var(--dsw-alias-interactive-bg-hover); }
+  .srv .srv-name { font-size:13px; font-weight:500; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .srv .srv-count { font-size:11px; color:var(--dsw-alias-label-tertiary); }
+  .srv-detail { font-size:11px; color:var(--dsw-alias-label-caption); padding:0 12px 6px 28px; }
+
+  .toast {
+    position:fixed; bottom:28px; left:50%; transform:translateX(-50%);
+    padding:10px 18px; border-radius:10px; font-size:13px; z-index:20;
+    background:var(--dsw-alias-bg-layer-1); border:1px solid var(--dsw-alias-border-l2);
+    box-shadow:0 8px 32px rgba(0,0,0,.18);
+  }
+  .toast.hidden { display:none; }
+</style>
+</head>
+<body data-theme="dark">
+
+<div class="demo-toolbar">
+  <span class="title">Skill &amp; MCP 管理中心 · UI 草案</span>
+  <span class="hint">左 = 设置分区（管理·静态）｜右 = 侧边栏 MCP tab（状态·动态，真实实现 1s 轮询）</span>
+  <button class="theme-toggle" onclick="toggleTheme()">切换主题</button>
+</div>
+
+<div class="app">
+  <!-- 设置面板 -->
+  <div class="settings">
+    <div class="nav" id="nav"></div>
+    <div class="content">
+      <div class="page-title">Skill &amp; MCP</div>
+      <div class="page-sub">管理放这里（静态配置）· 运行时状态在右侧边栏</div>
+      <div class="tabs">
+        <button class="tab active" data-view="skill" onclick="switchTab('skill')">Skill</button>
+        <button class="tab" data-view="mcp" onclick="switchTab('mcp')">MCP</button>
+      </div>
+      <div id="view-skill"></div>
+      <div id="view-mcp" style="display:none"></div>
+    </div>
+  </div>
+
+  <!-- 右侧边栏 MCP tab -->
+  <div class="sidebar">
+    <div class="sidebar-head">
+      <span>MCP</span>
+      <span class="hint">跟随会话 · 1s 轮询</span>
+    </div>
+    <div class="sidebar-body" id="sidebar-body"></div>
+  </div>
+</div>
+
+<div class="toast hidden" id="toast"></div>
+
+<script>
+// ---- 示例数据 ----
+const SKILLS = [
+  { name: 'dsh-code-review', description: '代码审查：定位 codebase 标准与 review 检查项。', source: 'system', provider: 'filesystem' },
+  { name: 'mxy-design-doc', description: '生成或更新功能设计方案与产品原型文档。', source: 'user', provider: 'filesystem' },
+  { name: 'plan-mode', description: '计划模式：先给计划，批准后再执行。', source: 'workspace', provider: 'filesystem' },
+  { name: 'omo-reflect', description: '工作回顾：发现重复模式，建议可复用 skill。', source: 'user', provider: 'filesystem' },
+  { name: 'runtime-x', description: '运行时注册的临时技能（示例）。', source: 'runtime', provider: 'runtime' },
+];
+
+let MCP = [
+  { id: 'mcp-1', serverName: 'filesystem', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-filesystem'], fiberPhase: 'active', toolCount: 12 },
+  { id: 'mcp-2', serverName: 'github', transport: 'stdio', command: 'npx', args: ['-y', '@modelcontextprotocol/server-github'], fiberPhase: 'active', toolCount: 23 },
+  { id: 'mcp-3', serverName: 'memory', transport: 'streamable-http', url: 'https://mcp.example.com/memory', fiberPhase: 'active', toolCount: 0 },
+];
+
+const SOURCE_LABEL = { system:'system', user:'user', workspace:'workspace', preset:'preset', runtime:'runtime' };
+
+// ---- 渲染 ----
+function renderNav() {
+  const items = ['通用', '模型', 'Skill & MCP', '插件中心', '关于'];
+  document.getElementById('nav').innerHTML = items.map((n, i) =>
+    `<div class="nav-item ${i === 2 ? 'active' : ''}">${n}</div>`).join('');
+}
+
+function renderSkills() {
+  document.getElementById('view-skill').innerHTML = SKILLS.map(s => `
+    <div class="card">
+      <div class="card-row">
+        <span class="name">${s.name}</span>
+        <span class="badge ${s.source}">${SOURCE_LABEL[s.source]}</span>
+        <span class="spacer"></span>
+        <button class="btn" title="定位到 skill 文件">定位文件</button>
+        <button class="btn" disabled title="官方 ctx.skills 暂无持久化启停 API">启用</button>
+      </div>
+      <div class="desc">${s.description}</div>
+      <div class="meta"><span class="badge">provider · ${s.provider}</span></div>
+    </div>`).join('');
+}
+
+function renderMcp() {
+  document.getElementById('view-mcp').innerHTML = `
+    <div class="card-row" style="margin-bottom:14px">
+      <button class="btn primary" onclick="toggleForm()">＋ 添加 server</button>
+      <span class="spacer"></span>
+      <span style="font-size:12px;color:var(--dsw-alias-label-tertiary)">增删改热生效，免重启</span>
+    </div>
+    <div id="form-wrap" style="display:none"></div>
+    <div id="mcp-list">${MCP.map(cardHtml).join('')}</div>`;
+}
+
+function cardHtml(m) {
+  const target = m.transport === 'stdio' ? `${m.command} ${(m.args || []).join(' ')}` : m.url;
+  const dotCls = m.fiberPhase === 'failed' ? 'failed' : (m.toolCount > 0 ? '' : 'idle');
+  return `
+    <div class="card" data-id="${m.id}">
+      <div class="card-row">
+        <span class="name">${m.serverName}</span>
+        <span class="badge ${m.transport === 'stdio' ? 'stdio' : 'http'}">${m.transport}</span>
+        <span class="dot ${dotCls}"></span>
+        <span class="spacer"></span>
+        <button class="btn" onclick="editServer('${m.id}')">编辑</button>
+        <button class="btn danger" onclick="removeServer('${m.id}')">删除</button>
+      </div>
+      <div class="desc">${target}</div>
+      <div class="meta"><span class="badge">${m.toolCount} 个工具</span></div>
+    </div>`;
+}
+
+function renderForm(editId) {
+  const m = editId ? MCP.find(x => x.id === editId) : null;
+  document.getElementById('form-wrap').style.display = 'block';
+  document.getElementById('form-wrap').innerHTML = `
+    <div class="form">
+      <div class="form-row">
+        <span class="form-label">serverName（必填，[A-Za-z0-9_-]{1,32}）</span>
+        <input id="f-name" value="${m ? m.serverName : ''}" placeholder="filesystem">
+      </div>
+      <div class="form-row">
+        <span class="form-label">transport</span>
+        <div class="seg">
+          <button id="f-seg-stdio" class="${!m || m.transport === 'stdio' ? 'active' : ''}" onclick="segTransport('stdio')">stdio</button>
+          <button id="f-seg-http" class="${m && m.transport === 'streamable-http' ? 'active' : ''}" onclick="segTransport('streamable-http')">streamable-http</button>
+        </div>
+      </div>
+      <div id="f-stdio" style="display:${!m || m.transport === 'stdio' ? 'block' : 'none'}">
+        <div class="form-row">
+          <span class="form-label">command</span>
+          <input id="f-command" value="${m ? (m.command || '') : ''}" placeholder="npx">
+        </div>
+        <div class="form-row">
+          <span class="form-label">args（空格分隔）</span>
+          <input id="f-args" value="${m ? (m.args || []).join(' ') : ''}" placeholder="-y @modelcontextprotocol/server-filesystem">
+        </div>
+      </div>
+      <div id="f-http" style="display:${m && m.transport === 'streamable-http' ? 'block' : 'none'}">
+        <div class="form-row">
+          <span class="form-label">url</span>
+          <input id="f-url" value="${m ? (m.url || '') : ''}" placeholder="https://mcp.example.com/xxx">
+        </div>
+      </div>
+      <div class="form-error" id="f-error"></div>
+      <div class="card-row" style="justify-content:flex-end; gap:8px">
+        <button class="btn" onclick="closeForm()">取消</button>
+        <button class="btn primary" onclick="saveServer('${editId || ''}')">${editId ? '保存' : '添加'}</button>
+      </div>
+    </div>`;
+}
+
+function renderSidebar() {
+  const body = document.getElementById('sidebar-body');
+  if (MCP.length === 0) {
+    body.innerHTML = `<div class="empty">未配置 MCP server</div>`;
+    return;
+  }
+  body.innerHTML = MCP.map(m => {
+    const dotCls = m.fiberPhase === 'failed' ? 'failed' : (m.toolCount > 0 ? '' : 'idle');
+    const stateText = m.fiberPhase === 'failed' ? 'failed' : (m.toolCount > 0 ? '已连接' : '未同步');
+    return `
+      <div>
+        <div class="srv" title="fiber ${m.fiberPhase} · 已注册 ${m.toolCount} 个工具（推断）">
+          <span class="dot ${dotCls}"></span>
+          <span class="srv-name">${m.serverName}</span>
+          <span class="srv-count">${m.toolCount} tools</span>
+        </div>
+        <div class="srv-detail">${stateText}</div>
+      </div>`;
+  }).join('');
+}
+
+// ---- 交互 ----
+let currentTransport = 'stdio';
+function switchTab(v) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.toggle('active', t.dataset.view === v));
+  document.getElementById('view-skill').style.display = v === 'skill' ? 'block' : 'none';
+  document.getElementById('view-mcp').style.display = v === 'mcp' ? 'block' : 'none';
+}
+function toggleForm() {
+  const w = document.getElementById('form-wrap');
+  if (w.style.display === 'none') renderForm(null); else closeForm();
+}
+function closeForm() { document.getElementById('form-wrap').style.display = 'none'; }
+function segTransport(t) {
+  currentTransport = t;
+  document.getElementById('f-seg-stdio').classList.toggle('active', t === 'stdio');
+  document.getElementById('f-seg-http').classList.toggle('active', t === 'streamable-http');
+  document.getElementById('f-stdio').style.display = t === 'stdio' ? 'block' : 'none';
+  document.getElementById('f-http').style.display = t === 'streamable-http' ? 'block' : 'none';
+}
+function saveServer(editId) {
+  const name = document.getElementById('f-name').value.trim();
+  const err = document.getElementById('f-error');
+  if (!/^[A-Za-z0-9_-]{1,32}$/.test(name)) { err.textContent = 'serverName 需匹配 [A-Za-z0-9_-]{1,32}'; return; }
+  if (MCP.some(x => x.serverName === name && x.id !== editId)) { err.textContent = 'serverName 重复'; return; }
+  err.textContent = '';
+  const transport = currentTransport;
+  const base = {
+    id: editId || ('mcp-' + Date.now()), serverName: name, transport,
+    fiberPhase: 'active', toolCount: 0,
+  };
+  if (transport === 'stdio') {
+    base.command = document.getElementById('f-command').value.trim() || 'npx';
+    base.args = document.getElementById('f-args').value.trim().split(/\s+/).filter(Boolean);
+  } else {
+    base.url = document.getElementById('f-url').value.trim();
+    if (!base.url) { err.textContent = 'streamable-http 需要 url'; return; }
+  }
+  if (editId) MCP = MCP.map(x => x.id === editId ? base : x);
+  else MCP.push(base);
+  closeForm();
+  renderMcp(); renderSidebar();
+  showToast(editId ? '已更新，热生效（免重启）' : '已添加，热连接（免重启）');
+}
+function editServer(id) { renderForm(id); }
+function removeServer(id) {
+  MCP = MCP.filter(x => x.id !== id);
+  renderMcp(); renderSidebar();
+  showToast('已删除，工具已下线');
+}
+function toggleTheme() {
+  const b = document.body;
+  b.dataset.theme = b.dataset.theme === 'dark' ? 'light' : 'dark';
+}
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.remove('hidden');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.add('hidden'), 2600);
+}
+
+// ---- boot ----
+renderNav();
+renderSkills();
+renderMcp();
+renderSidebar();
+</script>
+</body>
+</html>
