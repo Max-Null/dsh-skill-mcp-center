@@ -1,0 +1,54 @@
+/**
+ * `SkillMcpRpc` — a private loopback RPC channel exposing the engine to the
+ * browser half (same seam the plugin center uses; the Typert Remote path is
+ * closed to third parties).
+ */
+import { Service, type Context } from '@deepseek-ai/cordis'
+import type {} from '@deepseek-ai/dsh-client-connection'
+import type { RpcResult } from '@deepseek-ai/dsh-host-apiproxy/api'
+
+const CHANNEL = '/skill-mcp'
+
+function internal(message: string): RpcResult<unknown> {
+  return { ok: false, error: { code: 'internal', message, details: {} } }
+}
+
+export class SkillMcpRpc extends Service {
+  static inject = ['skillMcp', 'connection']
+
+  constructor(ctx: Context) {
+    super(ctx, 'skillMcpRpc')
+    ctx.connection.rpc.handle(CHANNEL, async (endpoint: string, payload: unknown): Promise<RpcResult<unknown>> => {
+      try {
+        const p = (payload ?? {}) as Record<string, unknown>
+        switch (endpoint) {
+          case 'listSkills':
+            return { ok: true, value: await ctx.skillMcp.listSkills() }
+          case 'toggleSkill': {
+            const name = p.name
+            if (typeof name !== 'string' || name === '') return internal('toggleSkill: name is required')
+            return { ok: true, value: await ctx.skillMcp.toggleSkill(name) }
+          }
+          case 'listMcpServers':
+            return { ok: true, value: await ctx.skillMcp.listMcpServers() }
+          case 'createMcpServer':
+            return { ok: true, value: await ctx.skillMcp.createMcpServer(p.config as never) }
+          case 'updateMcpServer':
+            return { ok: true, value: await ctx.skillMcp.updateMcpServer(String(p.id), p.config as never) }
+          case 'removeMcpServer':
+            return { ok: true, value: await ctx.skillMcp.removeMcpServer(String(p.id)) }
+          case 'setMcpServerEnabled':
+            return { ok: true, value: await ctx.skillMcp.setMcpServerEnabled(String(p.id), p.enabled === true) }
+          case 'mcpStatus':
+            return { ok: true, value: await ctx.skillMcp.mcpStatus() }
+          default:
+            return internal(`unknown endpoint "${endpoint}"`)
+        }
+      } catch (error) {
+        return internal(error instanceof Error ? error.message : String(error))
+      }
+    }, { authority: 'loopback' })
+  }
+}
+
+export default SkillMcpRpc
