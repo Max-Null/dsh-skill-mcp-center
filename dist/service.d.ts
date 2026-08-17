@@ -1,9 +1,10 @@
 /**
  * `SkillMcpService` — the process-local composition of skill and MCP
- * management. Skills are read through `ctx.skills` (toggled via the
- * `disable-model-invocation` frontmatter on SKILL.md); MCP servers are the
- * `mcp-client` loader entries, managed hot through `ctx.loader` and observed
- * through a feature-detected `ctx.mcpStatus` seam with a derived fallback.
+ * management. Skills are read straight off disk (host-level skill-filesystem
+ * is disabled in web-app — presets own discovery — so `ctx.skills` has no
+ * global layer to list); MCP servers are the `mcp-client` loader entries,
+ * managed hot through `ctx.loader` and observed through a feature-detected
+ * `ctx.mcpStatus` seam with a derived fallback.
  */
 import { Service, type Context } from '@deepseek-ai/cordis';
 declare module '@deepseek-ai/cordis' {
@@ -20,8 +21,10 @@ export interface SkillView {
     provider: string;
     modelInvocable: boolean;
     userInvocable: boolean;
-    /** Whether the toggle is available (disk-backed and outside the read-only tiers). */
+    /** Always true — user-level skills are disk-backed and toggleable. */
     writable: boolean;
+    /** Absolute SKILL.md path (the toggle target; opaque to the client display). */
+    path: string;
 }
 /** One MCP server as the Settings surface exposes it. */
 export interface McpServer {
@@ -57,10 +60,10 @@ export interface McpConfig {
 export declare class SkillMcpService extends Service {
     static inject: string[];
     constructor(ctx: Context);
-    /** All skills the deployment sees, with resolved invocation + writable flag. */
-    listSkills(): Promise<SkillView[]>;
+    /** User-level skills plus, when a workspace is given, its project-level skills. */
+    listSkills(cwd?: string): Promise<SkillView[]>;
     /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */
-    toggleSkill(name: string): Promise<SkillView>;
+    toggleSkill(path: string): Promise<SkillView>;
     /** Every `mcp-client` loader entry as a server card. */
     listMcpServers(): Promise<McpServer[]>;
     /** Add one mcp-client entry — hot-connects (create → init) and persists. */

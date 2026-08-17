@@ -120,6 +120,8 @@ function useLocale() {
 }
 var zhDict = {
   loading: "\u52A0\u8F7D\u4E2D\u2026",
+  loadFailed: "\u52A0\u8F7D\u5931\u8D25\uFF1A{e}",
+  noSkills: "\u672A\u53D1\u73B0\u4EFB\u4F55 skill\uFF08\u68C0\u67E5 ~/.dsh/skills \u4E0E\u9879\u76EE .agents/skills\uFF09",
   sourceSystem: "\u7CFB\u7EDF",
   sourceUser: "\u7528\u6237",
   sourceWorkspace: "\u5DE5\u4F5C\u533A",
@@ -160,6 +162,8 @@ var zhDict = {
 };
 var enDict = {
   loading: "Loading\u2026",
+  loadFailed: "Failed to load: {e}",
+  noSkills: "No skills found (check ~/.dsh/skills and project .agents/skills)",
   sourceSystem: "system",
   sourceUser: "user",
   sourceWorkspace: "workspace",
@@ -239,28 +243,32 @@ var SOURCE_GROUP = {
 function SkillView() {
   useLocale();
   const [items, setItems] = (0, import_react.useState)(null);
+  const [error, setError] = (0, import_react.useState)(null);
   const [busy, setBusy] = (0, import_react.useState)(null);
   const load = (0, import_react.useCallback)(() => {
     void rpc("listSkills").then(
       (v) => {
+        setError(null);
         setItems(v);
       },
-      () => {
-        setItems([]);
+      (e) => {
+        setError(e instanceof Error ? e.message : String(e));
       }
     );
   }, []);
   (0, import_react.useEffect)(() => {
     load();
   }, [load]);
+  if (error !== null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loadFailed", { e: error }) });
   if (items === null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loading") });
-  const toggle = (name) => {
-    setBusy(name);
-    void rpc("toggleSkill", { name }).then(
+  if (items.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("noSkills") });
+  const toggle = (s) => {
+    setBusy(s.path);
+    void rpc("toggleSkill", { path: s.path }).then(
       () => {
         setBusy(null);
         load();
-        showToast(t("skillToggled", { name }));
+        showToast(t("skillToggled", { name: s.name }));
       },
       (e) => {
         setBusy(null);
@@ -284,7 +292,7 @@ function SkillView() {
             disabled: !s.writable || busy === s.name,
             title: s.writable ? t("toggleModelVisible") : t("skillReadonly"),
             onClick: () => {
-              toggle(s.name);
+              toggle(s);
             },
             "aria-label": s.modelInvocable ? t("disable") : t("enable")
           }
@@ -298,20 +306,23 @@ function SkillView() {
 function McpView() {
   useLocale();
   const [items, setItems] = (0, import_react.useState)(null);
+  const [error, setError] = (0, import_react.useState)(null);
   const [editing, setEditing] = (0, import_react.useState)(null);
   const load = (0, import_react.useCallback)(() => {
     void rpc("listMcpServers").then(
       (v) => {
+        setError(null);
         setItems(v);
       },
-      () => {
-        setItems([]);
+      (e) => {
+        setError(e instanceof Error ? e.message : String(e));
       }
     );
   }, []);
   (0, import_react.useEffect)(() => {
     load();
   }, [load]);
+  if (error !== null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loadFailed", { e: error }) });
   if (items === null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loading") });
   const toggle = (s) => {
     void rpc("setMcpServerEnabled", { id: s.id, enabled: s.disabled }).then(
@@ -511,6 +522,44 @@ function Toast() {
   if (toast === null) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `smc-toast ${toast.kind}`, children: toast.message });
 }
+function SidebarSkillTab({ visible, cwd }) {
+  useLocale();
+  const [items, setItems] = (0, import_react.useState)([]);
+  const load = (0, import_react.useCallback)(() => {
+    void rpc("listSkills", { cwd }).then(
+      (v) => {
+        setItems(v);
+      },
+      () => {
+        setItems([]);
+      }
+    );
+  }, [cwd]);
+  (0, import_react.useEffect)(() => {
+    if (!visible) return;
+    load();
+  }, [visible, load]);
+  if (items.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noSkills") });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar", children: items.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `${s.description}
+${s.path}`, children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+      "button",
+      {
+        type: "button",
+        className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
+        title: t("toggleModelVisible"),
+        onClick: () => {
+          void rpc("toggleSkill", { path: s.path }).then(() => {
+            load();
+          });
+        },
+        "aria-label": s.modelInvocable ? t("disable") : t("enable")
+      }
+    )
+  ] }, s.path)) });
+}
 var inject = ["slots", "connection", "locale"];
 function apply(ctx) {
   injectCss();
@@ -544,9 +593,23 @@ function apply(ctx) {
     sidebarCtx.effect(() => service.registerTab({
       id: "@max-null/dsh-skill-mcp-center:mcp",
       title: () => "MCP",
+      icon: /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2", y: "2", width: "20", height: "8", rx: "2", ry: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2", y: "14", width: "20", height: "8", rx: "2", ry: "2" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", { x1: "6", y1: "6", x2: "6.01", y2: "6" }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", { x1: "6", y1: "18", x2: "6.01", y2: "18" })
+      ] }),
       order: 70,
       single: true,
       component: (props) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(McpSidebarTab, { visible: props.visible })
+    }));
+    sidebarCtx.effect(() => service.registerTab({
+      id: "@max-null/dsh-skill-mcp-center:skills",
+      title: () => "Skill",
+      icon: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "15", height: "15", viewBox: "0 0 24 24", fill: "none", stroke: "currentColor", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M13 2 3 14h7l-1 8 10-12h-7l1-8z" }) }),
+      order: 71,
+      single: true,
+      component: (props) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SidebarSkillTab, { visible: props.visible, cwd: props.scope?.cwd })
     }));
   });
   ctx.slots.inject("shell.overlay", () => ctx.slots.register({
