@@ -95,6 +95,8 @@ function useLocale(): number {
 }
 const zhDict: Record<string, string> = {
   loading: '加载中…',
+  loadFailed: '加载失败：{e}',
+  noSkills: '未发现任何 skill（检查 ~/.dsh/skills 与项目 .agents/skills）',
   sourceSystem: '系统',
   sourceUser: '用户',
   sourceWorkspace: '工作区',
@@ -135,6 +137,8 @@ const zhDict: Record<string, string> = {
 }
 const enDict: Record<string, string> = {
   loading: 'Loading…',
+  loadFailed: 'Failed to load: {e}',
+  noSkills: 'No skills found (check ~/.dsh/skills and project .agents/skills)',
   sourceSystem: 'system',
   sourceUser: 'user',
   sourceWorkspace: 'workspace',
@@ -183,6 +187,7 @@ interface SkillView {
   modelInvocable: boolean
   userInvocable: boolean
   writable: boolean
+  path: string
 }
 interface McpServer {
   id: string
@@ -242,19 +247,22 @@ const SOURCE_GROUP: Record<string, { label: string; cls: string }> = {
 function SkillView() {
   useLocale()
   const [items, setItems] = useState<SkillView[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
   const load = useCallback(() => {
     void rpc('listSkills').then(
-      v => { setItems(v as SkillView[]) },
-      () => { setItems([]) },
+      v => { setError(null); setItems(v as SkillView[]) },
+      e => { setError(e instanceof Error ? e.message : String(e)) },
     )
   }, [])
   useEffect(() => { load() }, [load])
+  if (error !== null) return <p className="smc-sub">{t('loadFailed', { e: error })}</p>
   if (items === null) return <p className="smc-sub">{t('loading')}</p>
-  const toggle = (name: string) => {
-    setBusy(name)
-    void rpc('toggleSkill', { name }).then(
-      () => { setBusy(null); load(); showToast(t('skillToggled', { name })) },
+  if (items.length === 0) return <p className="smc-sub">{t('noSkills')}</p>
+  const toggle = (s: SkillView) => {
+    setBusy(s.path)
+    void rpc('toggleSkill', { path: s.path }).then(
+      () => { setBusy(null); load(); showToast(t('skillToggled', { name: s.name })) },
       e => { setBusy(null); showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
   }
@@ -274,7 +282,7 @@ function SkillView() {
                 className={`smc-toggle${s.writable && s.modelInvocable ? ' on' : ''}`}
                 disabled={!s.writable || busy === s.name}
                 title={s.writable ? t('toggleModelVisible') : t('skillReadonly')}
-                onClick={() => { toggle(s.name) }}
+                onClick={() => { toggle(s) }}
                 aria-label={s.modelInvocable ? t('disable') : t('enable')}
               />
             </div>
@@ -291,14 +299,16 @@ function SkillView() {
 function McpView() {
   useLocale()
   const [items, setItems] = useState<McpServer[] | null>(null)
+  const [error, setError] = useState<string | null>(null)
   const [editing, setEditing] = useState<McpServer | 'new' | null>(null)
   const load = useCallback(() => {
     void rpc('listMcpServers').then(
-      v => { setItems(v as McpServer[]) },
-      () => { setItems([]) },
+      v => { setError(null); setItems(v as McpServer[]) },
+      e => { setError(e instanceof Error ? e.message : String(e)) },
     )
   }, [])
   useEffect(() => { load() }, [load])
+  if (error !== null) return <p className="smc-sub">{t('loadFailed', { e: error })}</p>
   if (items === null) return <p className="smc-sub">{t('loading')}</p>
   const toggle = (s: McpServer) => {
     void rpc('setMcpServerEnabled', { id: s.id, enabled: s.disabled }).then(
@@ -467,6 +477,40 @@ function Toast() {
   return <div className={`smc-toast ${toast.kind}`}>{toast.message}</div>
 }
 
+// ---- sidebar skills tab (session-scoped: user + project skills) ----
+function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
+  useLocale()
+  const [items, setItems] = useState<SkillView[]>([])
+  const load = useCallback(() => {
+    void rpc('listSkills', { cwd }).then(
+      v => { setItems(v as SkillView[]) },
+      () => { setItems([]) },
+    )
+  }, [cwd])
+  useEffect(() => {
+    if (!visible) return
+    load()
+  }, [visible, load])
+  if (items.length === 0) return <div className="smc-empty">{t('noSkills')}</div>
+  return (
+    <div className="smc-sidebar">
+      {items.map(s => (
+        <div key={s.path} className="smc-srv" title={`${s.description}\n${s.path}`}>
+          <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
+          <span className="smc-srv-name">{s.name}</span>
+          <button
+            type="button"
+            className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
+            title={t('toggleModelVisible')}
+            onClick={() => { void rpc('toggleSkill', { path: s.path }).then(() => { load() }) }}
+            aria-label={s.modelInvocable ? t('disable') : t('enable')}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
 // ---- client plugin body ----
 const inject = ['slots', 'connection', 'locale']
 
@@ -501,16 +545,36 @@ function apply(ctx: {
     name: 'settings.section', id: 'skill-mcp-center', order: 60, label: () => 'Skill & MCP',
   }, CenterPanel))
 
-  // Sidebar MCP tab (optional peer — without dsh-better-sidebar, registers nothing).
+  // Sidebar tabs (optional peer — without dsh-better-sidebar, registers nothing).
   ctx.inject(['betterSidebar'], (sidebarCtx: { betterSidebar?: { registerTab: (tab: unknown) => unknown }; effect: (fn: () => unknown) => void }) => {
     const service = sidebarCtx.betterSidebar
     if (service === undefined) return
     sidebarCtx.effect(() => service.registerTab({
       id: '@max-null/dsh-skill-mcp-center:mcp',
       title: () => 'MCP',
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <rect x="2" y="2" width="20" height="8" rx="2" ry="2" />
+          <rect x="2" y="14" width="20" height="8" rx="2" ry="2" />
+          <line x1="6" y1="6" x2="6.01" y2="6" />
+          <line x1="6" y1="18" x2="6.01" y2="18" />
+        </svg>
+      ),
       order: 70,
       single: true,
       component: (props: { visible: boolean }) => <McpSidebarTab visible={props.visible} />,
+    }))
+    sidebarCtx.effect(() => service.registerTab({
+      id: '@max-null/dsh-skill-mcp-center:skills',
+      title: () => 'Skill',
+      icon: (
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M13 2 3 14h7l-1 8 10-12h-7l1-8z" />
+        </svg>
+      ),
+      order: 71,
+      single: true,
+      component: (props: { visible: boolean; scope?: { cwd?: string } }) => <SidebarSkillTab visible={props.visible} cwd={props.scope?.cwd} />,
     }))
   })
 
