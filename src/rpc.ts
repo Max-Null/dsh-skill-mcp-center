@@ -22,12 +22,14 @@ export class SkillMcpRpc extends Service {
       try {
         const p = (payload ?? {}) as Record<string, unknown>
         switch (endpoint) {
-          case 'listSkills':
-            return { ok: true, value: await ctx.skillMcp.listSkills() }
+          case 'listSkills': {
+            const cwd = p.cwd
+            return { ok: true, value: await ctx.skillMcp.listSkills(typeof cwd === 'string' ? cwd : undefined) }
+          }
           case 'toggleSkill': {
-            const name = p.name
-            if (typeof name !== 'string' || name === '') return internal('toggleSkill: name is required')
-            return { ok: true, value: await ctx.skillMcp.toggleSkill(name) }
+            const path = p.path
+            if (typeof path !== 'string' || path === '') return internal('toggleSkill: path is required')
+            return { ok: true, value: await ctx.skillMcp.toggleSkill(path) }
           }
           case 'listMcpServers':
             return { ok: true, value: await ctx.skillMcp.listMcpServers() }

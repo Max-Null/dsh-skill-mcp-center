@@ -12,8 +12,8 @@ export type { McpConfig, McpServer, McpServerStatus, SkillView } from './service
 
 export const name = 'dsh-skill-mcp-center'
 
-/** The engine declares its own skills/loader/tools dependencies. */
-export const inject = ['skills', 'loader', 'tools']
+/** The engine declares its own loader/tools dependencies. */
+export const inject = ['loader', 'tools']
 
 export async function apply(ctx: Context): Promise<void> {
   await ctx.plugin(SkillMcpService)

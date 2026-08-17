@@ -1,16 +1,18 @@
 /**
  * `SkillMcpService` — the process-local composition of skill and MCP
- * management. Skills are read through `ctx.skills` (toggled via the
- * `disable-model-invocation` frontmatter on SKILL.md); MCP servers are the
- * `mcp-client` loader entries, managed hot through `ctx.loader` and observed
- * through a feature-detected `ctx.mcpStatus` seam with a derived fallback.
+ * management. Skills are read straight off disk (host-level skill-filesystem
+ * is disabled in web-app — presets own discovery — so `ctx.skills` has no
+ * global layer to list); MCP servers are the `mcp-client` loader entries,
+ * managed hot through `ctx.loader` and observed through a feature-detected
+ * `ctx.mcpStatus` seam with a derived fallback.
  */
 import { Service, type Context, type FiberState } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
-import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-tools'
-import { readFile, writeFile } from 'node:fs/promises'
-import { setDisableModelInvocation } from './frontmatter.ts'
+import { readdir, readFile, writeFile } from 'node:fs/promises'
+import { homedir } from 'node:os'
+import { join } from 'node:path'
+import { parseSkillFrontmatter, setDisableModelInvocation } from './frontmatter.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -37,8 +39,10 @@ export interface SkillView {
   provider: string
   modelInvocable: boolean
   userInvocable: boolean
-  /** Whether the toggle is available (disk-backed and outside the read-only tiers). */
+  /** Always true — user-level skills are disk-backed and toggleable. */
   writable: boolean
+  /** Absolute SKILL.md path (the toggle target; opaque to the client display). */
+  path: string
 }
 
 /** One MCP server as the Settings surface exposes it. */
@@ -75,11 +79,6 @@ export interface McpConfig {
   headers?: Record<string, string>
 }
 
-/** Bundled and runtime skills have no writable SKILL.md; the rest are toggleable. */
-function isWritableSource(source: string): boolean {
-  return source !== 'bundled' && source !== 'runtime'
-}
-
 /** Normalize a client MCP config into the full mcp-client config (defaults filled). */
 function fullMcpConfig(input: McpConfig): Record<string, unknown> {
   if (input.transport === 'stdio') {
@@ -104,43 +103,94 @@ function fullMcpConfig(input: McpConfig): Record<string, unknown> {
   }
 }
 
+/** User-level skill roots (host-level filesystem discovery is preset-owned in web). */
+const SKILL_ROOTS: readonly { path: string; source: string }[] = [
+  { path: join(homedir(), '.dsh', 'skills'), source: 'user-dsh' },
+  { path: join(homedir(), '.agents', 'skills'), source: 'user-agents' },
+]
+
+/** Absolute SKILL.md path for one directory/file entry, or null. */
+function skillPathFor(root: string, name: string, isDirectory: boolean): string | null {
+  if (isDirectory) return join(root, name, 'SKILL.md')
+  if (name.endsWith('.md')) return join(root, name)
+  return null
+}
+
+/** Scan one root for SKILL.md entries and parse their frontmatter. */
+async function scanSkillRoot(root: string, source: string): Promise<SkillView[]> {
+  let entries
+  try {
+    entries = await readdir(root, { withFileTypes: true })
+  } catch {
+    return [] // root absent
+  }
+  const skills: SkillView[] = []
+  for (const entry of entries) {
+    const skillPath = skillPathFor(root, entry.name, entry.isDirectory())
+    if (skillPath === null) continue
+    let text
+    try {
+      text = await readFile(skillPath, 'utf8')
+    } catch {
+      continue
+    }
+    const fm = parseSkillFrontmatter(text)
+    if (fm === null) continue
+    skills.push({
+      name: fm.name,
+      description: fm.description,
+      source,
+      provider: 'filesystem',
+      modelInvocable: fm.modelInvocable,
+      userInvocable: true,
+      writable: true,
+      path: skillPath,
+    })
+  }
+  return skills
+}
+
 export class SkillMcpService extends Service {
-  static inject = ['skills', 'loader', 'tools']
+  static inject = ['loader', 'tools']
 
   constructor(ctx: Context) {
     super(ctx, 'skillMcp')
   }
 
-  /** All skills the deployment sees, with resolved invocation + writable flag. */
-  async listSkills(): Promise<SkillView[]> {
-    const skills = await this.ctx.skills.list()
-    return skills.map(s => ({
-      name: s.name,
-      description: s.description,
-      source: s.source,
-      provider: s.provider,
-      modelInvocable: s.invocation.modelInvocable,
-      userInvocable: s.invocation.userInvocable,
-      writable: isWritableSource(s.source),
-    }))
+  /** User-level skills plus, when a workspace is given, its project-level skills. */
+  async listSkills(cwd?: string): Promise<SkillView[]> {
+    const skills: SkillView[] = []
+    for (const root of SKILL_ROOTS) {
+      skills.push(...await scanSkillRoot(root.path, root.source))
+    }
+    if (cwd !== undefined && cwd !== '') {
+      skills.push(...await scanSkillRoot(join(cwd, '.agents', 'skills'), 'project-agents'))
+      skills.push(...await scanSkillRoot(join(cwd, '.dsh', 'skills'), 'project-dsh'))
+    }
+    return skills
   }
 
   /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */
-  async toggleSkill(name: string): Promise<SkillView> {
-    const skill = await this.ctx.skills.get(name)
-    if (skill === undefined) throw new Error('skill-not-found')
-    if (!isWritableSource(skill.source) || skill.path === undefined) throw new Error('skill-readonly')
-    const text = await readFile(skill.path, 'utf8')
-    // Currently model-invocable → disable; the watcher invalidates the catalog.
-    await writeFile(skill.path, setDisableModelInvocation(text, skill.invocation.modelInvocable), 'utf8')
+  async toggleSkill(path: string): Promise<SkillView> {
+    let text
+    try {
+      text = await readFile(path, 'utf8')
+    } catch {
+      throw new Error('skill-not-found')
+    }
+    const fm = parseSkillFrontmatter(text)
+    if (fm === null) throw new Error('skill-not-found')
+    // Currently model-invocable → disable.
+    await writeFile(path, setDisableModelInvocation(text, fm.modelInvocable), 'utf8')
     return {
-      name: skill.name,
-      description: skill.description,
-      source: skill.source,
-      provider: skill.provider,
-      modelInvocable: !skill.invocation.modelInvocable,
-      userInvocable: skill.invocation.userInvocable,
+      name: fm.name,
+      description: fm.description,
+      source: 'user',
+      provider: 'filesystem',
+      modelInvocable: !fm.modelInvocable,
+      userInvocable: true,
       writable: true,
+      path,
     }
   }
 
@@ -148,7 +198,9 @@ export class SkillMcpService extends Service {
   async listMcpServers(): Promise<McpServer[]> {
     const servers: McpServer[] = []
     for (const entry of this.ctx.loader.entries()) {
-      if (entry.options.name !== 'mcp-client') continue
+      // The official bridge's specifier is the package name, not its internal
+      // plugin `name` ('mcp-client'); one entry = one MCP server.
+      if (entry.options.name !== '@deepseek-ai/dsh-mcp-client') continue
       const cfg = entry.options.config as Partial<McpConfig> | undefined
       servers.push({
         id: entry.id,
@@ -171,7 +223,7 @@ export class SkillMcpService extends Service {
     const id = `mcp-${config.serverName}`
     // loader.create's runtime ensureId honors an explicit id (cordis.yml rows
     // all carry one), but its d.ts Omit<EntryOptions,'id'> hides that — assert.
-    await this.ctx.loader.create({ id, name: 'mcp-client', config: fullMcpConfig(config) } as never)
+    await this.ctx.loader.create({ id, name: '@deepseek-ai/dsh-mcp-client', config: fullMcpConfig(config) } as never)
     return { id }
   }
 
