@@ -16,7 +16,17 @@ const CSS = `
 .smc-tab:hover { color: var(--dsw-alias-label-secondary); }
 .smc-tab.active { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-state-business-primary); }
 
-.smc-card { border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; background: var(--dsw-alias-bg-layer-1); min-width: 0; }
+.smc-card { border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; margin-bottom: 10px; background: var(--dsw-alias-bg-layer-1); min-width: 0; overflow: hidden; }
+.smc-card-pad { padding: 14px 16px; }
+.smc-card:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.smc-card-head { display: flex; align-items: center; }
+.smc-card-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 12px 8px 12px 16px; background: none; border: none; cursor: pointer; text-align: left; font-family: inherit; }
+.smc-card-title:hover .smc-card-name { color: var(--dsw-alias-state-business-primary); }
+.smc-card-name { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smc-card-desc { font-size: 12px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smc-chevron { flex: none; width: 8px; height: 8px; border-right: 1.5px solid var(--dsw-alias-label-caption); border-bottom: 1.5px solid var(--dsw-alias-label-caption); transform: rotate(45deg); transition: transform .15s; margin: 0 14px 0 4px; }
+.smc-chevron.open { transform: rotate(-135deg); }
+.smc-card .smc-detail { margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--dsw-alias-border-l1); }
 .smc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .smc-name { font-weight: 600; color: var(--dsw-alias-label-primary); }
 .smc-desc { color: var(--dsw-alias-label-secondary); font-size: 13px; margin-top: 4px; }
@@ -60,19 +70,33 @@ const CSS = `
 .smc-toast.ok { border-color: var(--dsw-alias-state-success-primary); }
 .smc-toast.error { border-color: var(--dsw-alias-state-error-primary); }
 
-.smc-sidebar { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+.smc-sidebar { display: flex; flex-direction: column; gap: 0; padding: 8px; height: 100%; box-sizing: border-box; }
+.smc-sidebar-head { flex: none; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); margin-bottom: 6px; }
+.smc-sidebar-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.smc-search-sidebar { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 100%; font-family: inherit; box-sizing: border-box; }
+.smc-search-sidebar:focus { border-color: var(--dsw-alias-state-business-primary); }
+.smc-search-sidebar::placeholder { color: var(--dsw-alias-label-caption); }
 .smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; }
 .smc-srv:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
-.smc-srv-count { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
+.smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
 .smc-srv-state { font-size: 11px; color: var(--dsw-alias-label-caption); padding: 0 10px 6px 26px; }
 .smc-empty { padding: 24px; text-align: center; color: var(--dsw-alias-label-tertiary); font-size: 12.5px; }
-.smc-search { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; margin-bottom: 12px; }
+.smc-ns-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+.smc-ns-btn { flex: 1; height: 26px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: none; color: var(--dsw-alias-label-secondary); font-size: 12px; cursor: pointer; font-family: inherit; }
+.smc-ns-btn:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.smc-ns-btn.active { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
+.smc-md { margin: 6px 0 2px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-bg-base); font-size: 11px; line-height: 1.6; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow-y: auto; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.smc-md-err { margin: 6px 0 2px; font-size: 11px; color: var(--dsw-alias-state-error-primary); }
+.smc-detail .smc-md { margin-top: 8px; }
+.smc-search { position: sticky; top: 0; z-index: 1; height: 30px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; }
 .smc-search:focus { border-color: var(--dsw-alias-state-business-primary); }
 .smc-search::placeholder { color: var(--dsw-alias-label-caption); }
+.smc-toolbar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 6px 2px; background: var(--dsw-alias-bg-layer-2); }
+.smc-toolbar .smc-search { position: static; width: 100%; flex: 1; margin: 0; }
+.smc-toolbar-count { flex: none; font-size: 12px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
 .smc-group { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary); }
 .smc-group .smc-count { font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-caption); }
-.smc-desc.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .smc-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); word-break: break-all; }
 .smc-detail-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 /* DSH 0.1.x 设置导航无 icon 契约（external section 一律默认齿轮）。settings-nav-icon
@@ -147,10 +171,6 @@ const zhDict: Record<string, string> = {
   loading: '加载中…',
   loadFailed: '加载失败：{e}',
   noSkills: '未发现任何 skill（检查 ~/.dsh/skills 与项目 .agents/skills）',
-  sourceSystem: '系统',
-  sourceUser: '用户',
-  sourceWorkspace: '工作区',
-  sourceRuntime: '运行时',
   sectionSub: '管理（静态配置）· 运行时状态在右侧边栏',
   modelDisabled: '模型已停用',
   toggleModelVisible: '切换模型可见',
@@ -193,15 +213,18 @@ const zhDict: Record<string, string> = {
   detailPath: '路径',
   detailProvider: 'provider',
   clickForDetail: '点击查看详情',
+  allNamespaces: '全部',
+  nsGlobal: '全局',
+  nsWorkspace: '工作区',
+  noWorkspace: '未选择工作区',
+  viewMd: '查看 SKILL.md',
+  hideMd: '收起',
+  mdLoadFailed: '读取失败：{e}',
 }
 const enDict: Record<string, string> = {
   loading: 'Loading…',
   loadFailed: 'Failed to load: {e}',
   noSkills: 'No skills found (check ~/.dsh/skills and project .agents/skills)',
-  sourceSystem: 'system',
-  sourceUser: 'user',
-  sourceWorkspace: 'workspace',
-  sourceRuntime: 'runtime',
   sectionSub: 'Manage (static config) · runtime status lives in the sidebar',
   modelDisabled: 'Model disabled',
   toggleModelVisible: 'Toggle model visibility',
@@ -244,6 +267,13 @@ const enDict: Record<string, string> = {
   detailPath: 'path',
   detailProvider: 'provider',
   clickForDetail: 'click for details',
+  allNamespaces: 'All',
+  nsGlobal: 'Global',
+  nsWorkspace: 'Workspace',
+  noWorkspace: 'No workspace selected',
+  viewMd: 'View SKILL.md',
+  hideMd: 'Hide',
+  mdLoadFailed: 'Failed to read: {e}',
 }
 
 // ---- wire types (mirror the host shapes) ----
@@ -302,15 +332,6 @@ function useToast(): { message: string; kind: 'ok' | 'error' } | null {
   return t
 }
 
-const SOURCE_GROUP: Record<string, { label: string; cls: string }> = {
-  bundled: { label: 'sourceSystem', cls: 'bundled' },
-  'user-dsh': { label: 'sourceUser', cls: 'user' },
-  'user-agents': { label: 'sourceUser', cls: 'user' },
-  'project-dsh': { label: 'sourceWorkspace', cls: 'workspace' },
-  'project-agents': { label: 'sourceWorkspace', cls: 'workspace' },
-  runtime: { label: 'sourceRuntime', cls: 'runtime' },
-}
-
 // ---- Skill tab ----
 /** Ordered display groups: which skill sources land under which heading. */
 const SKILL_GROUPS: { key: string; labelKey: string; sources: string[] }[] = [
@@ -329,6 +350,9 @@ function SkillView() {
   const [busy, setBusy] = useState<string | null>(null)
   const [query, setQuery] = useState('')
   const [expanded, setExpanded] = useState<string | null>(null)
+  const [mdPath, setMdPath] = useState<string | null>(null)
+  const [mdText, setMdText] = useState<string | null>(null)
+  const [mdError, setMdError] = useState<string | null>(null)
   const load = useCallback(() => {
     void rpc('listSkills').then(
       v => { setError(null); setItems(v as SkillView[]) },
@@ -345,15 +369,17 @@ function SkillView() {
       e => { setBusy(null); showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
   }
+  const openMd = (s: SkillView) => {
+    if (mdPath === s.path) { setMdPath(null); setMdText(null); setMdError(null); return }
+    setMdPath(s.path); setMdText(null); setMdError(null)
+    void rpc('readSkill', { path: s.path }).then(
+      v => { setMdText(v as string) },
+      e => { setMdError(e instanceof Error ? e.message : String(e)) },
+    )
+  }
   const q = query.trim().toLowerCase()
   const visible = items.filter(s =>
     q === '' || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
-  if (visible.length === 0) return (
-    <div>
-      <input className="smc-search" placeholder={t('searchSkills')} value={query} onChange={e => { setQuery(e.target.value) }} />
-      <p className="smc-sub">{t('noMatch')}</p>
-    </div>
-  )
   const buckets: SkillView[][] = SKILL_GROUPS.map(() => [])
   const other: SkillView[] = []
   for (const s of visible) {
@@ -362,35 +388,50 @@ function SkillView() {
     else other.push(s)
   }
   const renderCard = (s: SkillView) => {
-    const g = SOURCE_GROUP[s.source] ?? { label: s.source, cls: '' }
     const open = expanded === s.path
     return (
-      <div key={s.path} className="smc-card" title={t('clickForDetail')} onClick={() => { setExpanded(open ? null : s.path) }}>
-        <div className="smc-row">
-          <span className="smc-name">{s.name}</span>
-          <span className={`smc-badge ${g.cls}`}>{t(g.label)}</span>
-          {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
-          {!s.writable && <span className="smc-badge disabled">{t('readOnlyBadge')}</span>}
-          <span className="smc-spacer" />
+      <div key={s.path} className="smc-card">
+        <div className="smc-card-head">
+          <button
+            type="button"
+            className="smc-card-title"
+            aria-expanded={open}
+            title={t('clickForDetail')}
+            onClick={() => { setExpanded(open ? null : s.path) }}
+          >
+            <span className="smc-card-name">{s.name}</span>
+            <span className="smc-card-desc">{s.description}</span>
+          </button>
           {s.writable ? (
             <button
               type="button"
               className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
               disabled={busy === s.path}
               title={t('toggleModelVisible')}
-              onClick={(e) => { e.stopPropagation(); toggle(s) }}
+              onClick={() => { toggle(s) }}
               aria-label={s.modelInvocable ? t('disable') : t('enable')}
             />
           ) : null}
+          <span className={`smc-chevron${open ? ' open' : ''}`} />
         </div>
-        <div className={`smc-desc${open ? '' : ' clamped'}`}>{s.description}</div>
         {open && (
           <div className="smc-detail">
             <div className="smc-detail-row">
               <span className="smc-badge">{t('detailProvider')} · {s.provider}</span>
               <span className="smc-badge">{s.source}</span>
+              {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
+              {!s.writable && <span className="smc-badge disabled">{t('readOnlyBadge')}</span>}
+              <span className="smc-spacer" />
+              <button type="button" className="smc-btn" onClick={() => { openMd(s) }}>
+                {mdPath === s.path ? t('hideMd') : t('viewMd')}
+              </button>
             </div>
             <div className="smc-detail-row">{t('detailPath')}：{s.path}</div>
+            {mdPath === s.path && (
+              mdError !== null ? <div className="smc-md-err">{t('mdLoadFailed', { e: mdError })}</div>
+                : mdText === null ? <div className="smc-md">{t('loading')}</div>
+                  : <div className="smc-md">{mdText}</div>
+            )}
           </div>
         )}
       </div>
@@ -398,19 +439,26 @@ function SkillView() {
   }
   return (
     <div>
-      <input className="smc-search" placeholder={t('searchSkills')} value={query} onChange={e => { setQuery(e.target.value) }} />
-      {SKILL_GROUPS.map((g, i) => buckets[i].length > 0 ? (
-        <div key={g.key}>
-          <div className="smc-group">{t(g.labelKey)}<span className="smc-count">{buckets[i].length}</span></div>
-          {buckets[i].map(renderCard)}
-        </div>
-      ) : null)}
-      {other.length > 0 ? (
-        <div key="other">
-          <div className="smc-group">{other[0]?.source ?? ''}<span className="smc-count">{other.length}</span></div>
-          {other.map(renderCard)}
-        </div>
-      ) : null}
+      <div className="smc-toolbar">
+        <input className="smc-search" placeholder={t('searchSkills')} value={query} onChange={e => { setQuery(e.target.value) }} />
+        <span className="smc-toolbar-count">{visible.length}</span>
+      </div>
+      {visible.length === 0 ? <p className="smc-sub">{t('noMatch')}</p> : (
+        <>
+          {SKILL_GROUPS.map((g, i) => buckets[i].length > 0 ? (
+            <div key={g.key}>
+              <div className="smc-group">{t(g.labelKey)}<span className="smc-count">{buckets[i].length}</span></div>
+              {buckets[i].map(renderCard)}
+            </div>
+          ) : null)}
+          {other.length > 0 ? (
+            <div key="other">
+              <div className="smc-group">{other[0]?.source ?? ''}<span className="smc-count">{other.length}</span></div>
+              {other.map(renderCard)}
+            </div>
+          ) : null}
+        </>
+      )}
     </div>
   )
 }
@@ -452,7 +500,7 @@ function McpView() {
       </div>
       {editing !== null && <ServerForm server={editing === 'new' ? null : editing} onClose={() => { setEditing(null) }} onSaved={() => { setEditing(null); load() }} />}
       {items.map(s => (
-        <div key={s.id} className="smc-card">
+        <div key={s.id} className="smc-card smc-card-pad">
           <div className="smc-row">
             <span className="smc-name">{s.serverName}</span>
             <span className="smc-badge">{s.transport}</span>
@@ -598,9 +646,21 @@ function Toast() {
 }
 
 // ---- sidebar skills tab (session-scoped: user + project skills) ----
+/** Namespace filter mirroring the dsh-memory sidebar: all / global / workspace. */
+type SkillNamespace = 'all' | 'global' | 'workspace'
+function skillInNamespace(s: SkillView, ns: SkillNamespace): boolean {
+  if (ns === 'all') return true
+  if (ns === 'global') return s.source === 'user-dsh' || s.source === 'user-agents'
+  return s.source === 'project-dsh' || s.source === 'project-agents'
+}
 function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
   useLocale()
   const [items, setItems] = useState<SkillView[]>([])
+  const [ns, setNs] = useState<SkillNamespace>('all')
+  const [query, setQuery] = useState('')
+  const [mdPath, setMdPath] = useState<string | null>(null)
+  const [mdText, setMdText] = useState<string | null>(null)
+  const [mdError, setMdError] = useState<string | null>(null)
   const load = useCallback(() => {
     void rpc('listSkills', { cwd }).then(
       v => { setItems(v as SkillView[]) },
@@ -611,22 +671,76 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
     if (!visible) return
     load()
   }, [visible, load])
-  if (items.length === 0) return <div className="smc-empty">{t('noSkills')}</div>
+  const openMd = (path: string) => {
+    if (mdPath === path) { setMdPath(null); setMdText(null); setMdError(null); return }
+    setMdPath(path); setMdText(null); setMdError(null)
+    void rpc('readSkill', { path, cwd }).then(
+      v => { setMdText(v as string) },
+      e => { setMdError(e instanceof Error ? e.message : String(e)) },
+    )
+  }
+  const q = query.trim().toLowerCase()
+  const visibleItems = items.filter(s =>
+    skillInNamespace(s, ns) && (q === '' || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)))
+  const noWorkspace = ns === 'workspace' && (cwd === undefined || cwd === '')
   return (
     <div className="smc-sidebar">
-      {items.map(s => (
-        <div key={s.path} className="smc-srv" title={`${s.description}\n${s.path}`}>
-          <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
-          <span className="smc-srv-name">{s.name}</span>
-          <button
-            type="button"
-            className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
-            title={t('toggleModelVisible')}
-            onClick={() => { void rpc('toggleSkill', { path: s.path }).then(() => { load() }) }}
-            aria-label={s.modelInvocable ? t('disable') : t('enable')}
-          />
+      <div className="smc-sidebar-head">
+        <input
+          className="smc-search-sidebar"
+          placeholder={t('searchSkills')}
+          value={query}
+          onChange={e => { setQuery(e.target.value) }}
+        />
+        <div className="smc-ns-bar" style={{ marginBottom: 0 }}>
+          {(['all', 'global', 'workspace'] as SkillNamespace[]).map(k => (
+            <button
+              key={k}
+              type="button"
+              className={`smc-ns-btn${ns === k ? ' active' : ''}`}
+              onClick={() => { setNs(k); setMdPath(null); setMdText(null); setMdError(null) }}
+            >
+              {t(k === 'all' ? 'allNamespaces' : k === 'global' ? 'nsGlobal' : 'nsWorkspace')}
+            </button>
+          ))}
         </div>
-      ))}
+      </div>
+      <div className="smc-sidebar-list">
+        {noWorkspace ? <div className="smc-empty">{t('noWorkspace')}</div>
+          : visibleItems.length === 0 ? <div className="smc-empty">{q !== '' ? t('noMatch') : t('noSkills')}</div>
+            : visibleItems.map(s => (
+              <div key={s.path}>
+                <div className="smc-srv" title={`${s.description}\n${s.path}`}>
+                  <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
+                  <span className="smc-srv-name">{s.name}</span>
+                  {!s.modelInvocable && <span className="smc-srv-count">{t('modelDisabled')}</span>}
+                  {!s.writable && <span className="smc-srv-count">{t('readOnlyBadge')}</span>}
+                  <button
+                    type="button"
+                    className="smc-btn"
+                    style={{ height: 20, padding: '0 6px', fontSize: 11 }}
+                    onClick={() => { openMd(s.path) }}
+                    aria-label={mdPath === s.path ? t('hideMd') : t('viewMd')}
+                  >
+                    {mdPath === s.path ? t('hideMd') : 'MD'}
+                  </button>
+                  <button
+                    type="button"
+                    className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
+                    title={t('toggleModelVisible')}
+                    onClick={() => { void rpc('toggleSkill', { path: s.path }).then(() => { load() }) }}
+                    aria-label={s.modelInvocable ? t('disable') : t('enable')}
+                  />
+                </div>
+                {s.description !== '' && <div className="smc-srv-desc">{s.description}</div>}
+                {mdPath === s.path && (
+                  mdError !== null ? <div className="smc-md-err">{t('mdLoadFailed', { e: mdError })}</div>
+                    : mdText === null ? <div className="smc-md">{t('loading')}</div>
+                      : <div className="smc-md">{mdText}</div>
+                )}
+              </div>
+            ))}
+      </div>
     </div>
   )
 }

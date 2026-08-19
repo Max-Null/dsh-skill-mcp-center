@@ -40,7 +40,17 @@ var CSS = `
 .smc-tab:hover { color: var(--dsw-alias-label-secondary); }
 .smc-tab.active { color: var(--dsw-alias-label-primary); border-bottom-color: var(--dsw-alias-state-business-primary); }
 
-.smc-card { border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; padding: 14px 16px; margin-bottom: 10px; background: var(--dsw-alias-bg-layer-1); min-width: 0; }
+.smc-card { border: 1px solid var(--dsw-alias-border-l2); border-radius: 10px; margin-bottom: 10px; background: var(--dsw-alias-bg-layer-1); min-width: 0; overflow: hidden; }
+.smc-card-pad { padding: 14px 16px; }
+.smc-card:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.smc-card-head { display: flex; align-items: center; }
+.smc-card-title { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 3px; padding: 12px 8px 12px 16px; background: none; border: none; cursor: pointer; text-align: left; font-family: inherit; }
+.smc-card-title:hover .smc-card-name { color: var(--dsw-alias-state-business-primary); }
+.smc-card-name { font-size: 14px; font-weight: 600; color: var(--dsw-alias-label-primary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smc-card-desc { font-size: 12px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.smc-chevron { flex: none; width: 8px; height: 8px; border-right: 1.5px solid var(--dsw-alias-label-caption); border-bottom: 1.5px solid var(--dsw-alias-label-caption); transform: rotate(45deg); transition: transform .15s; margin: 0 14px 0 4px; }
+.smc-chevron.open { transform: rotate(-135deg); }
+.smc-card .smc-detail { margin: 0; padding: 10px 16px 14px; border-top: 1px solid var(--dsw-alias-border-l1); }
 .smc-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .smc-name { font-weight: 600; color: var(--dsw-alias-label-primary); }
 .smc-desc { color: var(--dsw-alias-label-secondary); font-size: 13px; margin-top: 4px; }
@@ -84,19 +94,33 @@ var CSS = `
 .smc-toast.ok { border-color: var(--dsw-alias-state-success-primary); }
 .smc-toast.error { border-color: var(--dsw-alias-state-error-primary); }
 
-.smc-sidebar { display: flex; flex-direction: column; gap: 2px; padding: 8px; }
+.smc-sidebar { display: flex; flex-direction: column; gap: 0; padding: 8px; height: 100%; box-sizing: border-box; }
+.smc-sidebar-head { flex: none; display: flex; flex-direction: column; gap: 6px; padding-bottom: 8px; border-bottom: 1px solid var(--dsw-alias-border-l1); margin-bottom: 6px; }
+.smc-sidebar-list { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; gap: 2px; }
+.smc-search-sidebar { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 100%; font-family: inherit; box-sizing: border-box; }
+.smc-search-sidebar:focus { border-color: var(--dsw-alias-state-business-primary); }
+.smc-search-sidebar::placeholder { color: var(--dsw-alias-label-caption); }
 .smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; }
 .smc-srv:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
-.smc-srv-count { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
+.smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
 .smc-srv-state { font-size: 11px; color: var(--dsw-alias-label-caption); padding: 0 10px 6px 26px; }
 .smc-empty { padding: 24px; text-align: center; color: var(--dsw-alias-label-tertiary); font-size: 12.5px; }
-.smc-search { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; margin-bottom: 12px; }
+.smc-ns-bar { display: flex; gap: 4px; margin-bottom: 8px; }
+.smc-ns-btn { flex: 1; height: 26px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: none; color: var(--dsw-alias-label-secondary); font-size: 12px; cursor: pointer; font-family: inherit; }
+.smc-ns-btn:hover { background: var(--dsw-alias-interactive-bg-hover); }
+.smc-ns-btn.active { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
+.smc-md { margin: 6px 0 2px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-bg-base); font-size: 11px; line-height: 1.6; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow-y: auto; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.smc-md-err { margin: 6px 0 2px; font-size: 11px; color: var(--dsw-alias-state-error-primary); }
+.smc-detail .smc-md { margin-top: 8px; }
+.smc-search { position: sticky; top: 0; z-index: 1; height: 30px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; }
 .smc-search:focus { border-color: var(--dsw-alias-state-business-primary); }
 .smc-search::placeholder { color: var(--dsw-alias-label-caption); }
+.smc-toolbar { position: sticky; top: 0; z-index: 1; display: flex; align-items: center; gap: 10px; margin-bottom: 12px; padding: 6px 2px; background: var(--dsw-alias-bg-layer-2); }
+.smc-toolbar .smc-search { position: static; width: 100%; flex: 1; margin: 0; }
+.smc-toolbar-count { flex: none; font-size: 12px; color: var(--dsw-alias-label-tertiary); white-space: nowrap; }
 .smc-group { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary); }
 .smc-group .smc-count { font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-caption); }
-.smc-desc.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .smc-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); word-break: break-all; }
 .smc-detail-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 /* DSH 0.1.x \u8BBE\u7F6E\u5BFC\u822A\u65E0 icon \u5951\u7EA6\uFF08external section \u4E00\u5F8B\u9ED8\u8BA4\u9F7F\u8F6E\uFF09\u3002settings-nav-icon
@@ -167,10 +191,6 @@ var zhDict = {
   loading: "\u52A0\u8F7D\u4E2D\u2026",
   loadFailed: "\u52A0\u8F7D\u5931\u8D25\uFF1A{e}",
   noSkills: "\u672A\u53D1\u73B0\u4EFB\u4F55 skill\uFF08\u68C0\u67E5 ~/.dsh/skills \u4E0E\u9879\u76EE .agents/skills\uFF09",
-  sourceSystem: "\u7CFB\u7EDF",
-  sourceUser: "\u7528\u6237",
-  sourceWorkspace: "\u5DE5\u4F5C\u533A",
-  sourceRuntime: "\u8FD0\u884C\u65F6",
   sectionSub: "\u7BA1\u7406\uFF08\u9759\u6001\u914D\u7F6E\uFF09\xB7 \u8FD0\u884C\u65F6\u72B6\u6001\u5728\u53F3\u4FA7\u8FB9\u680F",
   modelDisabled: "\u6A21\u578B\u5DF2\u505C\u7528",
   toggleModelVisible: "\u5207\u6362\u6A21\u578B\u53EF\u89C1",
@@ -212,16 +232,19 @@ var zhDict = {
   noMatch: "\u6CA1\u6709\u5339\u914D\u7684 skill",
   detailPath: "\u8DEF\u5F84",
   detailProvider: "provider",
-  clickForDetail: "\u70B9\u51FB\u67E5\u770B\u8BE6\u60C5"
+  clickForDetail: "\u70B9\u51FB\u67E5\u770B\u8BE6\u60C5",
+  allNamespaces: "\u5168\u90E8",
+  nsGlobal: "\u5168\u5C40",
+  nsWorkspace: "\u5DE5\u4F5C\u533A",
+  noWorkspace: "\u672A\u9009\u62E9\u5DE5\u4F5C\u533A",
+  viewMd: "\u67E5\u770B SKILL.md",
+  hideMd: "\u6536\u8D77",
+  mdLoadFailed: "\u8BFB\u53D6\u5931\u8D25\uFF1A{e}"
 };
 var enDict = {
   loading: "Loading\u2026",
   loadFailed: "Failed to load: {e}",
   noSkills: "No skills found (check ~/.dsh/skills and project .agents/skills)",
-  sourceSystem: "system",
-  sourceUser: "user",
-  sourceWorkspace: "workspace",
-  sourceRuntime: "runtime",
   sectionSub: "Manage (static config) \xB7 runtime status lives in the sidebar",
   modelDisabled: "Model disabled",
   toggleModelVisible: "Toggle model visibility",
@@ -263,7 +286,14 @@ var enDict = {
   noMatch: "No matching skills",
   detailPath: "path",
   detailProvider: "provider",
-  clickForDetail: "click for details"
+  clickForDetail: "click for details",
+  allNamespaces: "All",
+  nsGlobal: "Global",
+  nsWorkspace: "Workspace",
+  noWorkspace: "No workspace selected",
+  viewMd: "View SKILL.md",
+  hideMd: "Hide",
+  mdLoadFailed: "Failed to read: {e}"
 };
 var rpc = async () => {
   throw new Error("skill-mcp-center: rpc not wired");
@@ -295,14 +325,6 @@ function useToast() {
   }, [t2]);
   return t2;
 }
-var SOURCE_GROUP = {
-  bundled: { label: "sourceSystem", cls: "bundled" },
-  "user-dsh": { label: "sourceUser", cls: "user" },
-  "user-agents": { label: "sourceUser", cls: "user" },
-  "project-dsh": { label: "sourceWorkspace", cls: "workspace" },
-  "project-agents": { label: "sourceWorkspace", cls: "workspace" },
-  runtime: { label: "sourceRuntime", cls: "runtime" }
-};
 var SKILL_GROUPS = [
   { key: "global", labelKey: "groupGlobal", sources: ["user-dsh", "user-agents"] },
   { key: "workspace", labelKey: "groupWorkspace", sources: ["project-dsh", "project-agents"] },
@@ -319,6 +341,9 @@ function SkillView() {
   const [busy, setBusy] = (0, import_react.useState)(null);
   const [query, setQuery] = (0, import_react.useState)("");
   const [expanded, setExpanded] = (0, import_react.useState)(null);
+  const [mdPath, setMdPath] = (0, import_react.useState)(null);
+  const [mdText, setMdText] = (0, import_react.useState)(null);
+  const [mdError, setMdError] = (0, import_react.useState)(null);
   const load = (0, import_react.useCallback)(() => {
     void rpc("listSkills").then(
       (v) => {
@@ -349,14 +374,27 @@ function SkillView() {
       }
     );
   };
+  const openMd = (s) => {
+    if (mdPath === s.path) {
+      setMdPath(null);
+      setMdText(null);
+      setMdError(null);
+      return;
+    }
+    setMdPath(s.path);
+    setMdText(null);
+    setMdError(null);
+    void rpc("readSkill", { path: s.path }).then(
+      (v) => {
+        setMdText(v);
+      },
+      (e) => {
+        setMdError(e instanceof Error ? e.message : String(e));
+      }
+    );
+  };
   const q = query.trim().toLowerCase();
   const visible = items.filter((s) => q === "" || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q));
-  if (visible.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "smc-search", placeholder: t("searchSkills"), value: query, onChange: (e) => {
-      setQuery(e.target.value);
-    } }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("noMatch") })
-  ] });
   const buckets = SKILL_GROUPS.map(() => []);
   const other = [];
   for (const s of visible) {
@@ -365,17 +403,25 @@ function SkillView() {
     else other.push(s);
   }
   const renderCard = (s) => {
-    const g = SOURCE_GROUP[s.source] ?? { label: s.source, cls: "" };
     const open = expanded === s.path;
-    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card", title: t("clickForDetail"), onClick: () => {
-      setExpanded(open ? null : s.path);
-    }, children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-row", children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-name", children: s.name }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-badge ${g.cls}`, children: t(g.label) }),
-        !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("modelDisabled") }),
-        !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("readOnlyBadge") }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
+    return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+          "button",
+          {
+            type: "button",
+            className: "smc-card-title",
+            "aria-expanded": open,
+            title: t("clickForDetail"),
+            onClick: () => {
+              setExpanded(open ? null : s.path);
+            },
+            children: [
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-card-name", children: s.name }),
+              /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-card-desc", children: s.description })
+            ]
+          }
+        ),
         s.writable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
@@ -383,15 +429,14 @@ function SkillView() {
             className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
             disabled: busy === s.path,
             title: t("toggleModelVisible"),
-            onClick: (e) => {
-              e.stopPropagation();
+            onClick: () => {
               toggle(s);
             },
             "aria-label": s.modelInvocable ? t("disable") : t("enable")
           }
-        ) : null
+        ) : null,
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-chevron${open ? " open" : ""}` })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `smc-desc${open ? "" : " clamped"}`, children: s.description }),
       open && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail-row", children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "smc-badge", children: [
@@ -399,34 +444,46 @@ function SkillView() {
             " \xB7 ",
             s.provider
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: s.source })
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: s.source }),
+          !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("modelDisabled") }),
+          !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("readOnlyBadge") }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "smc-btn", onClick: () => {
+            openMd(s);
+          }, children: mdPath === s.path ? t("hideMd") : t("viewMd") })
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail-row", children: [
           t("detailPath"),
           "\uFF1A",
           s.path
-        ] })
+        ] }),
+        mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: mdText }))
       ] })
     ] }, s.path);
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "smc-search", placeholder: t("searchSkills"), value: query, onChange: (e) => {
-      setQuery(e.target.value);
-    } }),
-    SKILL_GROUPS.map((g, i) => buckets[i].length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-group", children: [
-        t(g.labelKey),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-count", children: buckets[i].length })
-      ] }),
-      buckets[i].map(renderCard)
-    ] }, g.key) : null),
-    other.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-group", children: [
-        other[0]?.source ?? "",
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-count", children: other.length })
-      ] }),
-      other.map(renderCard)
-    ] }, "other") : null
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-toolbar", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("input", { className: "smc-search", placeholder: t("searchSkills"), value: query, onChange: (e) => {
+        setQuery(e.target.value);
+      } }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-toolbar-count", children: visible.length })
+    ] }),
+    visible.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("noMatch") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(import_jsx_runtime.Fragment, { children: [
+      SKILL_GROUPS.map((g, i) => buckets[i].length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-group", children: [
+          t(g.labelKey),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-count", children: buckets[i].length })
+        ] }),
+        buckets[i].map(renderCard)
+      ] }, g.key) : null),
+      other.length > 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-group", children: [
+          other[0]?.source ?? "",
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-count", children: other.length })
+        ] }),
+        other.map(renderCard)
+      ] }, "other") : null
+    ] })
   ] });
 }
 function McpView() {
@@ -487,7 +544,7 @@ function McpView() {
       setEditing(null);
       load();
     } }),
-    items.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card", children: [
+    items.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card smc-card-pad", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-row", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-name", children: s.serverName }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: s.transport }),
@@ -648,9 +705,19 @@ function Toast() {
   if (toast === null) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `smc-toast ${toast.kind}`, children: toast.message });
 }
+function skillInNamespace(s, ns) {
+  if (ns === "all") return true;
+  if (ns === "global") return s.source === "user-dsh" || s.source === "user-agents";
+  return s.source === "project-dsh" || s.source === "project-agents";
+}
 function SidebarSkillTab({ visible, cwd }) {
   useLocale();
   const [items, setItems] = (0, import_react.useState)([]);
+  const [ns, setNs] = (0, import_react.useState)("all");
+  const [query, setQuery] = (0, import_react.useState)("");
+  const [mdPath, setMdPath] = (0, import_react.useState)(null);
+  const [mdText, setMdText] = (0, import_react.useState)(null);
+  const [mdError, setMdError] = (0, import_react.useState)(null);
   const load = (0, import_react.useCallback)(() => {
     void rpc("listSkills", { cwd }).then(
       (v) => {
@@ -665,26 +732,96 @@ function SidebarSkillTab({ visible, cwd }) {
     if (!visible) return;
     load();
   }, [visible, load]);
-  if (items.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noSkills") });
-  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar", children: items.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `${s.description}
-${s.path}`, children: [
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-      "button",
-      {
-        type: "button",
-        className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
-        title: t("toggleModelVisible"),
-        onClick: () => {
-          void rpc("toggleSkill", { path: s.path }).then(() => {
-            load();
-          });
-        },
-        "aria-label": s.modelInvocable ? t("disable") : t("enable")
+  const openMd = (path) => {
+    if (mdPath === path) {
+      setMdPath(null);
+      setMdText(null);
+      setMdError(null);
+      return;
+    }
+    setMdPath(path);
+    setMdText(null);
+    setMdError(null);
+    void rpc("readSkill", { path, cwd }).then(
+      (v) => {
+        setMdText(v);
+      },
+      (e) => {
+        setMdError(e instanceof Error ? e.message : String(e));
       }
-    )
-  ] }, s.path)) });
+    );
+  };
+  const q = query.trim().toLowerCase();
+  const visibleItems = items.filter((s) => skillInNamespace(s, ns) && (q === "" || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q)));
+  const noWorkspace = ns === "workspace" && (cwd === void 0 || cwd === "");
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-sidebar", children: [
+    /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-sidebar-head", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "input",
+        {
+          className: "smc-search-sidebar",
+          placeholder: t("searchSkills"),
+          value: query,
+          onChange: (e) => {
+            setQuery(e.target.value);
+          }
+        }
+      ),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-ns-bar", style: { marginBottom: 0 }, children: ["all", "global", "workspace"].map((k) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        "button",
+        {
+          type: "button",
+          className: `smc-ns-btn${ns === k ? " active" : ""}`,
+          onClick: () => {
+            setNs(k);
+            setMdPath(null);
+            setMdText(null);
+            setMdError(null);
+          },
+          children: t(k === "all" ? "allNamespaces" : k === "global" ? "nsGlobal" : "nsWorkspace")
+        },
+        k
+      )) })
+    ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar-list", children: noWorkspace ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noWorkspace") }) : visibleItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: q !== "" ? t("noMatch") : t("noSkills") }) : visibleItems.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `${s.description}
+${s.path}`, children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
+        !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-count", children: t("modelDisabled") }),
+        !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-count", children: t("readOnlyBadge") }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: "smc-btn",
+            style: { height: 20, padding: "0 6px", fontSize: 11 },
+            onClick: () => {
+              openMd(s.path);
+            },
+            "aria-label": mdPath === s.path ? t("hideMd") : t("viewMd"),
+            children: mdPath === s.path ? t("hideMd") : "MD"
+          }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
+            title: t("toggleModelVisible"),
+            onClick: () => {
+              void rpc("toggleSkill", { path: s.path }).then(() => {
+                load();
+              });
+            },
+            "aria-label": s.modelInvocable ? t("disable") : t("enable")
+          }
+        )
+      ] }),
+      s.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-desc", children: s.description }),
+      mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: mdText }))
+    ] }, s.path)) })
+  ] });
 }
 var inject = ["slots", "connection", "locale"];
 function apply(ctx) {

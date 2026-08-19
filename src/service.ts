@@ -11,7 +11,7 @@ import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-tools'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import { parseSkillFrontmatter, setDisableModelInvocation } from './frontmatter.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -206,6 +206,29 @@ export class SkillMcpService extends Service {
     }
   }
 
+  /**
+   * Read one skill's SKILL.md raw text for display. Paths must live under a
+   * known skill root — a plain path join against the same roots `listSkills`
+   * scans, so the RPC cannot be used to read arbitrary files.
+   */
+  async readSkill(path: string, cwd?: string): Promise<string> {
+    const roots = [...SKILL_ROOTS.map(root => root.path)]
+    if (cwd !== undefined && cwd !== '') {
+      roots.push(join(cwd, '.agents', 'skills'), join(cwd, '.dsh', 'skills'))
+    }
+    roots.push(...this.officialSkillDirs)
+    // Segment-boundary prefix check: a sibling directory like `skills-notes`
+    // must not satisfy a `skills` root. join(root, '') normalizes to root.
+    if (!roots.some(root => path === root || path.startsWith(`${root}${sep}`))) throw new Error('skill-not-found')
+    let text
+    try {
+      text = await readFile(path, 'utf8')
+    } catch {
+      throw new Error('skill-not-found')
+    }
+    return text
+  }
+
   /** Every `mcp-client` loader entry as a server card. */
   async listMcpServers(): Promise<McpServer[]> {
     const servers: McpServer[] = []
@@ -257,7 +280,9 @@ export class SkillMcpService extends Service {
   /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
   async mcpStatus(): Promise<McpServerStatus[]> {
     const servers = await this.listMcpServers()
-    const seam = (this.ctx as Context & { mcpStatus?: { list(): { serverName: string; phase: string; toolCount: number }[] } }).mcpStatus
+    const seam = (this.ctx as Context).get(
+      'mcpStatus',
+    ) as { list(): { serverName: string; phase: string; toolCount: number }[] } | undefined
     if (seam !== undefined) {
       const byName = new Map(seam.list().map(s => [s.serverName, s]))
       return servers.map(s => {

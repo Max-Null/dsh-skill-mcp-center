@@ -70,6 +70,12 @@ export declare class SkillMcpService extends Service {
     listSkills(cwd?: string): Promise<SkillView[]>;
     /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */
     toggleSkill(path: string): Promise<SkillView>;
+    /**
+     * Read one skill's SKILL.md raw text for display. Paths must live under a
+     * known skill root — a plain path join against the same roots `listSkills`
+     * scans, so the RPC cannot be used to read arbitrary files.
+     */
+    readSkill(path: string, cwd?: string): Promise<string>;
     /** Every `mcp-client` loader entry as a server card. */
     listMcpServers(): Promise<McpServer[]>;
     /** Add one mcp-client entry — hot-connects (create → init) and persists. */

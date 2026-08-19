@@ -9,7 +9,7 @@
 import { Service } from '@deepseek-ai/cordis';
 import { readdir, readFile, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { join, sep } from 'node:path';
 import { parseSkillFrontmatter, setDisableModelInvocation } from "./frontmatter.js";
 /** Runtime mirror of cordis FiberState (a cross-package const enum). */
 const FIBER_PHASE = {
@@ -140,6 +140,30 @@ export class SkillMcpService extends Service {
             path,
         };
     }
+    /**
+     * Read one skill's SKILL.md raw text for display. Paths must live under a
+     * known skill root — a plain path join against the same roots `listSkills`
+     * scans, so the RPC cannot be used to read arbitrary files.
+     */
+    async readSkill(path, cwd) {
+        const roots = [...SKILL_ROOTS.map(root => root.path)];
+        if (cwd !== undefined && cwd !== '') {
+            roots.push(join(cwd, '.agents', 'skills'), join(cwd, '.dsh', 'skills'));
+        }
+        roots.push(...this.officialSkillDirs);
+        // Segment-boundary prefix check: a sibling directory like `skills-notes`
+        // must not satisfy a `skills` root. join(root, '') normalizes to root.
+        if (!roots.some(root => path === root || path.startsWith(`${root}${sep}`)))
+            throw new Error('skill-not-found');
+        let text;
+        try {
+            text = await readFile(path, 'utf8');
+        }
+        catch {
+            throw new Error('skill-not-found');
+        }
+        return text;
+    }
     /** Every `mcp-client` loader entry as a server card. */
     async listMcpServers() {
         const servers = [];
@@ -187,7 +211,7 @@ export class SkillMcpService extends Service {
     /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
     async mcpStatus() {
         const servers = await this.listMcpServers();
-        const seam = this.ctx.mcpStatus;
+        const seam = this.ctx.get('mcpStatus');
         if (seam !== undefined) {
             const byName = new Map(seam.list().map(s => [s.serverName, s]));
             return servers.map(s => {

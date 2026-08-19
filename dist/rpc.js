@@ -26,6 +26,13 @@ export class SkillMcpRpc extends Service {
                             return internal('toggleSkill: path is required');
                         return { ok: true, value: await ctx.skillMcp.toggleSkill(path) };
                     }
+                    case 'readSkill': {
+                        const path = p.path;
+                        if (typeof path !== 'string' || path === '')
+                            return internal('readSkill: path is required');
+                        const cwd = p.cwd;
+                        return { ok: true, value: await ctx.skillMcp.readSkill(path, typeof cwd === 'string' ? cwd : undefined) };
+                    }
                     case 'listMcpServers':
                         return { ok: true, value: await ctx.skillMcp.listMcpServers() };
                     case 'createMcpServer':
