@@ -67,6 +67,14 @@ const CSS = `
 .smc-srv-count { font-size: 11px; color: var(--dsw-alias-label-tertiary); }
 .smc-srv-state { font-size: 11px; color: var(--dsw-alias-label-caption); padding: 0 10px 6px 26px; }
 .smc-empty { padding: 24px; text-align: center; color: var(--dsw-alias-label-tertiary); font-size: 12.5px; }
+.smc-search { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; margin-bottom: 12px; }
+.smc-search:focus { border-color: var(--dsw-alias-state-business-primary); }
+.smc-search::placeholder { color: var(--dsw-alias-label-caption); }
+.smc-group { display: flex; align-items: baseline; gap: 8px; margin: 14px 0 8px; font-size: 13px; font-weight: 600; color: var(--dsw-alias-label-secondary); }
+.smc-group .smc-count { font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-caption); }
+.smc-desc.clamped { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.smc-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); word-break: break-all; }
+.smc-detail-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
 /* DSH 0.1.x 设置导航无 icon 契约（external section 一律默认齿轮）。settings-nav-icon
    标记本插件行后：隐藏壳渲染的齿轮 SVG，用 Lucide wrench 的 currentColor mask 替换，
    跟随原生导航 hover/active 颜色且不改变壳的 16px 图标节奏。 */
@@ -176,6 +184,15 @@ const zhDict: Record<string, string> = {
   connected: '已连接',
   notSynced: '未同步',
   failed: 'failed',
+  searchSkills: '搜索 skill（名称 / 描述）…',
+  groupGlobal: '全局',
+  groupWorkspace: '工作区',
+  groupBundled: '内置（DSH 官方）',
+  readOnlyBadge: '内置只读',
+  noMatch: '没有匹配的 skill',
+  detailPath: '路径',
+  detailProvider: 'provider',
+  clickForDetail: '点击查看详情',
 }
 const enDict: Record<string, string> = {
   loading: 'Loading…',
@@ -218,6 +235,15 @@ const enDict: Record<string, string> = {
   connected: 'Connected',
   notSynced: 'Not synced',
   failed: 'failed',
+  searchSkills: 'Search skills (name / description)…',
+  groupGlobal: 'Global',
+  groupWorkspace: 'Workspace',
+  groupBundled: 'Built-in (DSH official)',
+  readOnlyBadge: 'built-in read-only',
+  noMatch: 'No matching skills',
+  detailPath: 'path',
+  detailProvider: 'provider',
+  clickForDetail: 'click for details',
 }
 
 // ---- wire types (mirror the host shapes) ----
@@ -286,11 +312,23 @@ const SOURCE_GROUP: Record<string, { label: string; cls: string }> = {
 }
 
 // ---- Skill tab ----
+/** Ordered display groups: which skill sources land under which heading. */
+const SKILL_GROUPS: { key: string; labelKey: string; sources: string[] }[] = [
+  { key: 'global', labelKey: 'groupGlobal', sources: ['user-dsh', 'user-agents'] },
+  { key: 'workspace', labelKey: 'groupWorkspace', sources: ['project-dsh', 'project-agents'] },
+  { key: 'bundled', labelKey: 'groupBundled', sources: ['bundled'] },
+]
+function groupOf(source: string): number {
+  const idx = SKILL_GROUPS.findIndex(g => g.sources.includes(source))
+  return idx === -1 ? SKILL_GROUPS.length : idx // unknown sources land in a trailing "other" bucket
+}
 function SkillView() {
   useLocale()
   const [items, setItems] = useState<SkillView[] | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [busy, setBusy] = useState<string | null>(null)
+  const [query, setQuery] = useState('')
+  const [expanded, setExpanded] = useState<string | null>(null)
   const load = useCallback(() => {
     void rpc('listSkills').then(
       v => { setError(null); setItems(v as SkillView[]) },
@@ -300,7 +338,6 @@ function SkillView() {
   useEffect(() => { load() }, [load])
   if (error !== null) return <p className="smc-sub">{t('loadFailed', { e: error })}</p>
   if (items === null) return <p className="smc-sub">{t('loading')}</p>
-  if (items.length === 0) return <p className="smc-sub">{t('noSkills')}</p>
   const toggle = (s: SkillView) => {
     setBusy(s.path)
     void rpc('toggleSkill', { path: s.path }).then(
@@ -308,31 +345,72 @@ function SkillView() {
       e => { setBusy(null); showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
   }
+  const q = query.trim().toLowerCase()
+  const visible = items.filter(s =>
+    q === '' || s.name.toLowerCase().includes(q) || s.description.toLowerCase().includes(q))
+  if (visible.length === 0) return (
+    <div>
+      <input className="smc-search" placeholder={t('searchSkills')} value={query} onChange={e => { setQuery(e.target.value) }} />
+      <p className="smc-sub">{t('noMatch')}</p>
+    </div>
+  )
+  const buckets: SkillView[][] = SKILL_GROUPS.map(() => [])
+  const other: SkillView[] = []
+  for (const s of visible) {
+    const g = groupOf(s.source)
+    if (g < SKILL_GROUPS.length) buckets[g].push(s)
+    else other.push(s)
+  }
+  const renderCard = (s: SkillView) => {
+    const g = SOURCE_GROUP[s.source] ?? { label: s.source, cls: '' }
+    const open = expanded === s.path
+    return (
+      <div key={s.path} className="smc-card" title={t('clickForDetail')} onClick={() => { setExpanded(open ? null : s.path) }}>
+        <div className="smc-row">
+          <span className="smc-name">{s.name}</span>
+          <span className={`smc-badge ${g.cls}`}>{t(g.label)}</span>
+          {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
+          {!s.writable && <span className="smc-badge disabled">{t('readOnlyBadge')}</span>}
+          <span className="smc-spacer" />
+          {s.writable ? (
+            <button
+              type="button"
+              className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
+              disabled={busy === s.path}
+              title={t('toggleModelVisible')}
+              onClick={(e) => { e.stopPropagation(); toggle(s) }}
+              aria-label={s.modelInvocable ? t('disable') : t('enable')}
+            />
+          ) : null}
+        </div>
+        <div className={`smc-desc${open ? '' : ' clamped'}`}>{s.description}</div>
+        {open && (
+          <div className="smc-detail">
+            <div className="smc-detail-row">
+              <span className="smc-badge">{t('detailProvider')} · {s.provider}</span>
+              <span className="smc-badge">{s.source}</span>
+            </div>
+            <div className="smc-detail-row">{t('detailPath')}：{s.path}</div>
+          </div>
+        )}
+      </div>
+    )
+  }
   return (
     <div>
-      {items.map(s => {
-        const g = SOURCE_GROUP[s.source] ?? { label: s.source, cls: '' }
-        return (
-          <div key={s.name} className="smc-card">
-            <div className="smc-row">
-              <span className="smc-name">{s.name}</span>
-              <span className={`smc-badge ${g.cls}`}>{t(g.label)}</span>
-              {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
-              <span className="smc-spacer" />
-              <button
-                type="button"
-                className={`smc-toggle${s.writable && s.modelInvocable ? ' on' : ''}`}
-                disabled={!s.writable || busy === s.name}
-                title={s.writable ? t('toggleModelVisible') : t('skillReadonly')}
-                onClick={() => { toggle(s) }}
-                aria-label={s.modelInvocable ? t('disable') : t('enable')}
-              />
-            </div>
-            <div className="smc-desc">{s.description}</div>
-            <div className="smc-meta"><span className="smc-badge">{t('provider', { name: s.provider })}</span></div>
-          </div>
-        )
-      })}
+      <input className="smc-search" placeholder={t('searchSkills')} value={query} onChange={e => { setQuery(e.target.value) }} />
+      {SKILL_GROUPS.map((g, i) => buckets[i].length > 0 ? (
+        <div key={g.key}>
+          <div className="smc-group">{t(g.labelKey)}<span className="smc-count">{buckets[i].length}</span></div>
+          {buckets[i].map(renderCard)}
+        </div>
+      ) : null)}
+      {other.length > 0 ? (
+        <div key="other">
+          <div className="smc-group">{other[0]?.source ?? ''}<span className="smc-count">{other.length}</span></div>
+          {other.map(renderCard)}
+        </div>
+      ) : null}
     </div>
   )
 }

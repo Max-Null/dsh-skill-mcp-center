@@ -45,6 +45,12 @@ export interface SkillView {
   path: string
 }
 
+/** Plugin configuration for the skill/MCP engine. */
+export interface SkillConfig {
+  /** Additional read-only official/bundled skill roots (e.g. the harness repo's own `.agents/skills`). */
+  officialSkillDirs?: string[]
+}
+
 /** One MCP server as the Settings surface exposes it. */
 export interface McpServer {
   id: string
@@ -117,7 +123,7 @@ function skillPathFor(root: string, name: string, isDirectory: boolean): string 
 }
 
 /** Scan one root for SKILL.md entries and parse their frontmatter. */
-async function scanSkillRoot(root: string, source: string): Promise<SkillView[]> {
+async function scanSkillRoot(root: string, source: string, writable = true, provider = 'filesystem'): Promise<SkillView[]> {
   let entries
   try {
     entries = await readdir(root, { withFileTypes: true })
@@ -140,10 +146,10 @@ async function scanSkillRoot(root: string, source: string): Promise<SkillView[]>
       name: fm.name,
       description: fm.description,
       source,
-      provider: 'filesystem',
+      provider,
       modelInvocable: fm.modelInvocable,
       userInvocable: true,
-      writable: true,
+      writable,
       path: skillPath,
     })
   }
@@ -153,8 +159,11 @@ async function scanSkillRoot(root: string, source: string): Promise<SkillView[]>
 export class SkillMcpService extends Service {
   static inject = ['loader', 'tools']
 
-  constructor(ctx: Context) {
+  private readonly officialSkillDirs: readonly string[]
+
+  constructor(ctx: Context, config: SkillConfig = {}) {
     super(ctx, 'skillMcp')
+    this.officialSkillDirs = config.officialSkillDirs ?? []
   }
 
   /** User-level skills plus, when a workspace is given, its project-level skills. */
@@ -166,6 +175,9 @@ export class SkillMcpService extends Service {
     if (cwd !== undefined && cwd !== '') {
       skills.push(...await scanSkillRoot(join(cwd, '.agents', 'skills'), 'project-agents'))
       skills.push(...await scanSkillRoot(join(cwd, '.dsh', 'skills'), 'project-dsh'))
+    }
+    for (const dir of this.officialSkillDirs) {
+      skills.push(...await scanSkillRoot(dir, 'bundled', false, 'dsh-official'))
     }
     return skills
   }

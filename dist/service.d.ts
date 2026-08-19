@@ -26,6 +26,11 @@ export interface SkillView {
     /** Absolute SKILL.md path (the toggle target; opaque to the client display). */
     path: string;
 }
+/** Plugin configuration for the skill/MCP engine. */
+export interface SkillConfig {
+    /** Additional read-only official/bundled skill roots (e.g. the harness repo's own `.agents/skills`). */
+    officialSkillDirs?: string[];
+}
 /** One MCP server as the Settings surface exposes it. */
 export interface McpServer {
     id: string;
@@ -59,7 +64,8 @@ export interface McpConfig {
 }
 export declare class SkillMcpService extends Service {
     static inject: string[];
-    constructor(ctx: Context);
+    private readonly officialSkillDirs;
+    constructor(ctx: Context, config?: SkillConfig);
     /** User-level skills plus, when a workspace is given, its project-level skills. */
     listSkills(cwd?: string): Promise<SkillView[]>;
     /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */

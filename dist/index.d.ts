@@ -4,9 +4,10 @@
  * package's `dsh.client` declaration.
  */
 import type { Context } from '@deepseek-ai/cordis';
+import type { SkillConfig } from './service.ts';
 export { SkillMcpService } from './service.ts';
-export type { McpConfig, McpServer, McpServerStatus, SkillView } from './service.ts';
+export type { McpConfig, McpServer, McpServerStatus, SkillConfig, SkillView } from './service.ts';
 export declare const name = "dsh-skill-mcp-center";
 /** The engine declares its own loader/tools dependencies. */
 export declare const inject: string[];
-export declare function apply(ctx: Context): Promise<void>;
+export declare function apply(ctx: Context, config?: SkillConfig): Promise<void>;

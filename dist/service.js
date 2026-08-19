@@ -57,7 +57,7 @@ function skillPathFor(root, name, isDirectory) {
     return null;
 }
 /** Scan one root for SKILL.md entries and parse their frontmatter. */
-async function scanSkillRoot(root, source) {
+async function scanSkillRoot(root, source, writable = true, provider = 'filesystem') {
     let entries;
     try {
         entries = await readdir(root, { withFileTypes: true });
@@ -84,10 +84,10 @@ async function scanSkillRoot(root, source) {
             name: fm.name,
             description: fm.description,
             source,
-            provider: 'filesystem',
+            provider,
             modelInvocable: fm.modelInvocable,
             userInvocable: true,
-            writable: true,
+            writable,
             path: skillPath,
         });
     }
@@ -95,8 +95,10 @@ async function scanSkillRoot(root, source) {
 }
 export class SkillMcpService extends Service {
     static inject = ['loader', 'tools'];
-    constructor(ctx) {
+    officialSkillDirs;
+    constructor(ctx, config = {}) {
         super(ctx, 'skillMcp');
+        this.officialSkillDirs = config.officialSkillDirs ?? [];
     }
     /** User-level skills plus, when a workspace is given, its project-level skills. */
     async listSkills(cwd) {
@@ -107,6 +109,9 @@ export class SkillMcpService extends Service {
         if (cwd !== undefined && cwd !== '') {
             skills.push(...await scanSkillRoot(join(cwd, '.agents', 'skills'), 'project-agents'));
             skills.push(...await scanSkillRoot(join(cwd, '.dsh', 'skills'), 'project-dsh'));
+        }
+        for (const dir of this.officialSkillDirs) {
+            skills.push(...await scanSkillRoot(dir, 'bundled', false, 'dsh-official'));
         }
         return skills;
     }
