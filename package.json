@@ -1,6 +1,6 @@
 {
   "name": "@max-null/dsh-skill-mcp-center",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "description": "Skill & MCP management center for DeepSeek Harness — manage skills and MCP servers in Settings, live MCP status in the sidebar",
   "license": "MIT",
   "publishConfig": {
