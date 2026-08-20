@@ -323,22 +323,18 @@ let openFileRef: ((path: string, title?: string) => void) | null = null
 const FILE_REF_RE = /@("([^"]+)"|([^\s"@]+))/g
 interface FileRefToken { raw: string; path: string }
 /**
- * Whether a bare @token looks like a file path worth linking. Pure package
- * names (@scope/name), bare words, and domain-like tokens must not render as
- * clickable — they are not files. Quoted forms (@"...") always qualify
- * (explicit user intent).
+ * Whether a bare @token looks like a file path worth linking. Package names
+ * (@scope/name, @scope/name/subpath), bare words, domain-like tokens, and
+ * extension-less directory chains must not render as clickable — they are not
+ * reliably files. Quoted forms (@"...") always qualify (explicit user intent).
  */
 function looksLikePath(path: string): boolean {
   if (path.includes('\\')) return true
   if (path.startsWith('./') || path.startsWith('../') || path.startsWith('/') || path.startsWith('~/')) return true
   if (path.includes('/')) {
-    // A single slash with no dots and no extension is a package name
-    // (@scope/name); deeper paths or dotted segments are files.
-    if (!path.includes('.')) {
-      const segments = path.split('/')
-      return segments.length > 2
-    }
-    return true
+    // Any dotted segment (README.md, dist/main.js) marks a file path; pure
+    // package names and extension-less directory chains stay plain text.
+    return path.includes('.')
   }
   // No separators: only dotted names with a plausible file extension
   // (file.txt, archive.tar.gz); bare words and domain-like names (b.com,
