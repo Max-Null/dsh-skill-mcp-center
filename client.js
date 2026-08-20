@@ -111,6 +111,8 @@ var CSS = `
 .smc-ns-btn:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-ns-btn.active { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
 .smc-md { margin: 6px 0 2px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-bg-base); font-size: 11px; line-height: 1.6; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow-y: auto; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.smc-ref { display: inline; padding: 0 3px; border-radius: 4px; background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-state-business-primary); cursor: pointer; text-decoration: underline dotted; }
+.smc-ref:hover { background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-bg-base); }
 .smc-md-err { margin: 6px 0 2px; font-size: 11px; color: var(--dsw-alias-state-error-primary); }
 .smc-detail .smc-md { margin-top: 8px; }
 .smc-search { position: sticky; top: 0; z-index: 1; height: 30px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; }
@@ -239,7 +241,8 @@ var zhDict = {
   noWorkspace: "\u672A\u9009\u62E9\u5DE5\u4F5C\u533A",
   viewMd: "\u67E5\u770B SKILL.md",
   hideMd: "\u6536\u8D77",
-  mdLoadFailed: "\u8BFB\u53D6\u5931\u8D25\uFF1A{e}"
+  mdLoadFailed: "\u8BFB\u53D6\u5931\u8D25\uFF1A{e}",
+  refOpen: "\u6253\u5F00\u6587\u4EF6\u5F15\u7528"
 };
 var enDict = {
   loading: "Loading\u2026",
@@ -293,11 +296,43 @@ var enDict = {
   noWorkspace: "No workspace selected",
   viewMd: "View SKILL.md",
   hideMd: "Hide",
-  mdLoadFailed: "Failed to read: {e}"
+  mdLoadFailed: "Failed to read: {e}",
+  refOpen: "Open file reference"
 };
 var rpc = async () => {
   throw new Error("skill-mcp-center: rpc not wired");
 };
+var openFileRef = null;
+var FILE_REF_RE = /@("([^"]+)"|([^\s"@]+))/g;
+function splitFileRefs(text) {
+  const parts = [];
+  let last = 0;
+  let m;
+  FILE_REF_RE.lastIndex = 0;
+  while ((m = FILE_REF_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push({ kind: "text", text: text.slice(last, m.index) });
+    parts.push({ kind: "ref", ref: { raw: m[0], path: m[2] ?? m[3] } });
+    last = m.index + m[0].length;
+  }
+  if (last < text.length) parts.push({ kind: "text", text: text.slice(last) });
+  return parts;
+}
+function MdWithRefs({ text }) {
+  const parts = splitFileRefs(text);
+  if (parts.every((p) => p.kind === "text")) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: text });
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(import_jsx_runtime.Fragment, { children: parts.map((p, i) => p.kind === "text" ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: p.text }, i) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    "span",
+    {
+      className: "smc-ref",
+      title: t("refOpen"),
+      onClick: () => {
+        openFileRef?.(p.ref.path, p.ref.path);
+      },
+      children: p.ref.raw
+    },
+    i
+  )) });
+}
 var toastState = null;
 var toastListeners = /* @__PURE__ */ new Set();
 function showToast(message, kind = "ok") {
@@ -457,7 +492,7 @@ function SkillView() {
           "\uFF1A",
           s.path
         ] }),
-        mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: mdText }))
+        mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
       ] })
     ] }, s.path);
   };
@@ -819,7 +854,7 @@ ${s.path}`, children: [
         )
       ] }),
       s.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-desc", children: s.description }),
-      mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: mdText }))
+      mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
     ] }, s.path)) })
   ] });
 }
@@ -854,6 +889,11 @@ function apply(ctx) {
   ctx.inject(["betterSidebar"], (sidebarCtx) => {
     const service = sidebarCtx.betterSidebar;
     if (service === void 0) return;
+    if (typeof service.openFile === "function") {
+      openFileRef = (path, title) => {
+        service.openFile?.({}, path, title);
+      };
+    }
     sidebarCtx.effect(() => service.registerTab({
       id: "@max-null/dsh-skill-mcp-center:mcp",
       title: () => "MCP",

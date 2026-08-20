@@ -87,6 +87,8 @@ const CSS = `
 .smc-ns-btn:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-ns-btn.active { color: var(--dsw-alias-state-business-primary); border-color: var(--dsw-alias-state-business-primary); }
 .smc-md { margin: 6px 0 2px; padding: 8px 10px; border: 1px solid var(--dsw-alias-border-l1); border-radius: 8px; background: var(--dsw-alias-bg-base); font-size: 11px; line-height: 1.6; color: var(--dsw-alias-label-secondary); white-space: pre-wrap; word-break: break-all; max-height: 240px; overflow-y: auto; font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; }
+.smc-ref { display: inline; padding: 0 3px; border-radius: 4px; background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-state-business-primary); cursor: pointer; text-decoration: underline dotted; }
+.smc-ref:hover { background: var(--dsw-alias-state-business-primary); color: var(--dsw-alias-bg-base); }
 .smc-md-err { margin: 6px 0 2px; font-size: 11px; color: var(--dsw-alias-state-error-primary); }
 .smc-detail .smc-md { margin-top: 8px; }
 .smc-search { position: sticky; top: 0; z-index: 1; height: 30px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 240px; font-family: inherit; }
@@ -220,6 +222,7 @@ const zhDict: Record<string, string> = {
   viewMd: '查看 SKILL.md',
   hideMd: '收起',
   mdLoadFailed: '读取失败：{e}',
+  refOpen: '打开文件引用',
 }
 const enDict: Record<string, string> = {
   loading: 'Loading…',
@@ -274,6 +277,7 @@ const enDict: Record<string, string> = {
   viewMd: 'View SKILL.md',
   hideMd: 'Hide',
   mdLoadFailed: 'Failed to read: {e}',
+  refOpen: 'Open file reference',
 }
 
 // ---- wire types (mirror the host shapes) ----
@@ -309,6 +313,51 @@ interface McpServerStatus {
 
 type Rpc = (endpoint: string, payload?: unknown) => Promise<unknown>
 let rpc: Rpc = async () => { throw new Error('skill-mcp-center: rpc not wired') }
+
+/** better-sidebar openFile(scope, path, title), wired when the peer is present. */
+let openFileRef: ((path: string, title?: string) => void) | null = null
+
+// ---- file reference rendering ----
+// Match @path and @"path with spaces" mentions (rc.8 file-reference grammar
+// subset: bare token until whitespace, quoted token until closing quote).
+const FILE_REF_RE = /@("([^"]+)"|([^\s"@]+))/g
+interface FileRefToken { raw: string; path: string }
+/** Extract @-mentions from plain text, preserving non-match segments. */
+function splitFileRefs(text: string): Array<{ kind: 'text'; text: string } | { kind: 'ref'; ref: FileRefToken }> {
+  const parts: Array<{ kind: 'text'; text: string } | { kind: 'ref'; ref: FileRefToken }> = []
+  let last = 0
+  let m: RegExpExecArray | null
+  FILE_REF_RE.lastIndex = 0
+  while ((m = FILE_REF_RE.exec(text)) !== null) {
+    if (m.index > last) parts.push({ kind: 'text', text: text.slice(last, m.index) })
+    parts.push({ kind: 'ref', ref: { raw: m[0], path: m[2] ?? m[3]! } })
+    last = m.index + m[0].length
+  }
+  if (last < text.length) parts.push({ kind: 'text', text: text.slice(last) })
+  return parts
+}
+
+/** SKILL.md content with @-mentions rendered as clickable file references. */
+function MdWithRefs({ text }: { text: string }) {
+  const parts = splitFileRefs(text)
+  if (parts.every(p => p.kind === 'text')) return <>{text}</>
+  return (
+    <>
+      {parts.map((p, i) => p.kind === 'text'
+        ? <span key={i}>{p.text}</span>
+        : (
+          <span
+            key={i}
+            className="smc-ref"
+            title={t('refOpen')}
+            onClick={() => { openFileRef?.(p.ref.path, p.ref.path) }}
+          >
+            {p.ref.raw}
+          </span>
+        ))}
+    </>
+  )
+}
 
 // ---- toast ----
 let toastState: { message: string; kind: 'ok' | 'error' } | null = null
@@ -430,7 +479,7 @@ function SkillView() {
             {mdPath === s.path && (
               mdError !== null ? <div className="smc-md-err">{t('mdLoadFailed', { e: mdError })}</div>
                 : mdText === null ? <div className="smc-md">{t('loading')}</div>
-                  : <div className="smc-md">{mdText}</div>
+                  : <div className="smc-md"><MdWithRefs text={mdText} /></div>
             )}
           </div>
         )}
@@ -736,7 +785,7 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                 {mdPath === s.path && (
                   mdError !== null ? <div className="smc-md-err">{t('mdLoadFailed', { e: mdError })}</div>
                     : mdText === null ? <div className="smc-md">{t('loading')}</div>
-                      : <div className="smc-md">{mdText}</div>
+                      : <div className="smc-md"><MdWithRefs text={mdText} /></div>
                 )}
               </div>
             ))}
@@ -783,9 +832,12 @@ function apply(ctx: {
   }, CenterPanel))
 
   // Sidebar tabs (optional peer — without dsh-better-sidebar, registers nothing).
-  ctx.inject(['betterSidebar'], (sidebarCtx: { betterSidebar?: { registerTab: (tab: unknown) => unknown }; effect: (fn: () => unknown) => void }) => {
+  ctx.inject(['betterSidebar'], (sidebarCtx: { betterSidebar?: { registerTab: (tab: unknown) => unknown; openFile?: (scope: unknown, path: string, title?: string) => unknown }; effect: (fn: () => unknown) => void }) => {
     const service = sidebarCtx.betterSidebar
     if (service === undefined) return
+    if (typeof service.openFile === 'function') {
+      openFileRef = (path: string, title?: string) => { service.openFile?.({}, path, title) }
+    }
     sidebarCtx.effect(() => service.registerTab({
       id: '@max-null/dsh-skill-mcp-center:mcp',
       title: () => 'MCP',
