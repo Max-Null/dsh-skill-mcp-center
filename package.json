@@ -1,6 +1,6 @@
 {
   "name": "@max-null/dsh-skill-mcp-center",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Skill & MCP management center for DeepSeek Harness — manage skills and MCP servers in Settings, live MCP status in the sidebar",
   "license": "MIT",
   "publishConfig": {
@@ -64,18 +64,18 @@
   "peerDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/cordis-plugin-loader": "^1.0.2",
-    "@deepseek-ai/dsh-client-connection": ">=0.0.1-rc.5",
-    "@deepseek-ai/dsh-host-apiproxy": ">=0.0.1-rc.5",
-    "@deepseek-ai/dsh-skill": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7"
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-host-apiproxy": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-skill": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.1-rc.1"
   },
   "devDependencies": {
     "@deepseek-ai/cordis": "^4.0.1",
     "@deepseek-ai/cordis-plugin-loader": "^1.0.2",
-    "@deepseek-ai/dsh-client-connection": ">=0.0.1-rc.5",
-    "@deepseek-ai/dsh-host-apiproxy": ">=0.0.1-rc.5",
-    "@deepseek-ai/dsh-skill": "^0.1.0-rc.7",
-    "@deepseek-ai/dsh-tools": "^0.1.0-rc.7",
+    "@deepseek-ai/dsh-client-connection": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-host-apiproxy": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-skill": "^0.1.1-rc.1",
+    "@deepseek-ai/dsh-tools": "^0.1.1-rc.1",
     "@types/js-yaml": "^4.0.9",
     "@types/node": "^26.2.0",
     "@types/react": "~18.3.1",
