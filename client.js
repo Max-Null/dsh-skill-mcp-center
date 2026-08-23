@@ -76,10 +76,10 @@ var CSS = `
 .smc-dot.idle { background: var(--dsw-alias-label-caption); }
 .smc-dot.failed { background: var(--dsw-alias-state-error-primary); }
 
-.smc-toggle { position: relative; width: 34px; height: 20px; border-radius: 10px; border: none; cursor: pointer; background: var(--dsw-alias-bg-module-platform); transition: background .15s; }
-.smc-toggle.on { background: var(--dsw-alias-state-success-primary); }
-.smc-toggle::after { content: ''; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: var(--dsw-alias-bg-base); transition: left .15s; }
-.smc-toggle.on::after { left: 16px; }
+.smc-toggle { position: relative; flex: none; width: 40px; height: 22px; border-radius: 11px; border: none; cursor: pointer; background: var(--dsw-alias-bg-module-platform, rgba(128,148,168,.2)); transition: background .15s; padding: 0; }
+.smc-toggle.on { background: var(--dsw-alias-state-business-primary, #4FC3F7); }
+.smc-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
+.smc-toggle.on::after { left: 21px; }
 .smc-toggle:disabled { opacity: 0.4; cursor: default; }
 
 .smc-input { height: 28px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; font-family: inherit; }
