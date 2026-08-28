@@ -7,16 +7,18 @@ import { load } from 'js-yaml'
 
 /** Toggle `disable-model-invocation` in SKILL.md text; creates frontmatter if absent. */
 export function setDisableModelInvocation(text: string, disabled: boolean): string {
+  const eol = text.includes('\r\n') ? '\r\n' : '\n'
   const match = /^---\r?\n([\s\S]*?)\r?\n---/.exec(text)
   if (match === null) {
-    return `---\ndisable-model-invocation: ${disabled}\n---\n\n${text}`
+    return `---${eol}disable-model-invocation: ${disabled}${eol}---${eol}${eol}${text}`
   }
   const full = match[0]
   const body = match[1]!
   const line = /^(\s*)disable-model-invocation\s*:.*$/m
   const next = line.test(body)
     ? body.replace(line, `$1disable-model-invocation: ${disabled}`)
-    : body.replace(/\s*$/, `\ndisable-model-invocation: ${disabled}`)
+    // 追加分支沿用文件现有行尾(CRLF 文件不混入 LF,防止混合行尾扩散)。
+    : body.replace(/\s*$/, `${eol}disable-model-invocation: ${disabled}`)
   return text.replace(full, full.replace(body, next))
 }
 
