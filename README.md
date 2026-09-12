@@ -15,6 +15,17 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 - **Live status / 实时状态** — a sidebar "MCP" tab (via `dsh-better-sidebar`) showing per-server connection state + tool count, polled while visible and following the session.
 - **Skin-compatible / 皮肤兼容** — every color uses `var(--dsw-*)` tokens.
 
+## 截图
+
+装完后在设置里多出「Skill & MCP」一项，可控制各模型对 Skill/MCP 的可见性：
+
+**入口：** 设置 → Skill & MCP
+
+| 设置入口与面板 |
+|---|
+| ![设置 → Skill & MCP](docs/shots/skill-mcp-1.png) |
+
+
 ## Install / 安装
 
 ```sh

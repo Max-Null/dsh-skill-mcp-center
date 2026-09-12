@@ -21,8 +21,7 @@
   "files": [
     "dist",
     "client.js",
-    "cordis.patch.yml"
-  ],
+    "cordis.patch.yml", "docs/shots"],
   "dsh": {
     "bundle": {
       "patch": "./cordis.patch.yml"
