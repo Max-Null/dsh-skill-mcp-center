@@ -105,6 +105,11 @@ var CSS = `
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
 .smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
 .smc-srv-state { font-size: 11px; color: var(--dsw-alias-label-caption); padding: 0 10px 6px 26px; }
+.smc-tools { list-style: none; margin: 0 0 8px; padding: 0 10px 0 26px; display: flex; flex-direction: column; gap: 0; }
+.smc-tool { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; border-top: 1px solid var(--dsw-alias-border-l1); }
+.smc-tool:first-child { border-top: none; }
+.smc-tool-name { font-size: 11.5px; font-weight: 500; color: var(--dsw-alias-label-secondary); font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; word-break: break-all; }
+.smc-tool-desc { font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .smc-empty { padding: 24px; text-align: center; color: var(--dsw-alias-label-tertiary); font-size: 12.5px; }
 .smc-ns-bar { display: flex; gap: 4px; margin-bottom: 8px; }
 .smc-ns-btn { flex: 1; height: 26px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: none; color: var(--dsw-alias-label-secondary); font-size: 12px; cursor: pointer; font-family: inherit; }
@@ -496,7 +501,7 @@ function SkillView() {
             " \xB7 ",
             s.provider
           ] }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: s.source }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: sourceLabel(s.source) }),
           !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("modelDisabled") }),
           !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("readOnlyBadge") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
@@ -748,7 +753,14 @@ function McpSidebarTab({ visible }) {
           " tools"
         ] })
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-state", children: state })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-state", children: state }),
+      s.tools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "smc-tools", children: s.tools.map((tool) => {
+        const short = tool.name.startsWith(`mcp__${s.serverName}__`) ? tool.name.slice(`mcp__${s.serverName}__`.length) : tool.name;
+        return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "smc-tool", title: tool.name, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-tool-name", children: short }),
+          tool.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-tool-desc", children: tool.description })
+        ] }, tool.name);
+      }) })
     ] }, s.serverName);
   }) });
 }
@@ -757,9 +769,16 @@ function Toast() {
   if (toast === null) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `smc-toast ${toast.kind}`, children: toast.message });
 }
+function sourceLabel(source) {
+  if (!source.startsWith("plugin:")) return source;
+  const pkg = source.slice("plugin:".length);
+  return `plugin \xB7 ${pkg.split("/").pop() ?? pkg}`;
+}
 function skillInNamespace(s, ns) {
   if (ns === "all") return true;
-  if (ns === "global") return s.source === "user-dsh" || s.source === "user-agents";
+  if (ns === "global") {
+    return s.source === "user-dsh" || s.source === "user-agents" || s.source.startsWith("plugin:");
+  }
   return s.source === "project-dsh" || s.source === "project-agents";
 }
 function SidebarSkillTab({ visible, cwd }) {

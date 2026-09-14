@@ -10,9 +10,9 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 
 ## Features / 功能
 
-- **Skill management / Skill 管理** — browse every skill by tier (system / user / workspace / runtime), toggle model invocation via the `disable-model-invocation` frontmatter (disk-backed skills only).
+- **Skill management / Skill 管理** — browse every skill by tier (system / user / workspace / runtime), toggle model invocation via the `disable-model-invocation` frontmatter (disk-backed skills only). Covers skills shipped **inside plugin packages** (e.g. `@max-null/dsh-skills`), not just the user-level roots — the host-level skill filesystem is disabled in web-app, so a plugin's own `skills/` directory would otherwise be invisible while its skills are loaded and in effect.
 - **MCP management / MCP 管理** — add / edit / remove `mcp-client` servers, enable/disable without deleting config, all **hot-applied** through `ctx.loader` (no restart).
-- **Live status / 实时状态** — a sidebar "MCP" tab (via `dsh-better-sidebar`) showing per-server connection state + tool count, polled while visible and following the session.
+- **Live status / 实时状态** — a sidebar "MCP" tab (via `dsh-better-sidebar`) showing per-server connection state, **each tool's name and description** (names come from `tools.schemas()`; the redundant `mcp__<server>__` prefix is hidden, the full name stays on hover), polled while visible and following the session.
 - **Skin-compatible / 皮肤兼容** — every color uses `var(--dsw-*)` tokens.
 
 ## 截图

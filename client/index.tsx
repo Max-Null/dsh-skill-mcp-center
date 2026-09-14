@@ -81,6 +81,11 @@ const CSS = `
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
 .smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
 .smc-srv-state { font-size: 11px; color: var(--dsw-alias-label-caption); padding: 0 10px 6px 26px; }
+.smc-tools { list-style: none; margin: 0 0 8px; padding: 0 10px 0 26px; display: flex; flex-direction: column; gap: 0; }
+.smc-tool { display: flex; flex-direction: column; gap: 1px; padding: 5px 0; border-top: 1px solid var(--dsw-alias-border-l1); }
+.smc-tool:first-child { border-top: none; }
+.smc-tool-name { font-size: 11.5px; font-weight: 500; color: var(--dsw-alias-label-secondary); font-family: ui-monospace, 'Cascadia Code', Consolas, monospace; word-break: break-all; }
+.smc-tool-desc { font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-tertiary); display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
 .smc-empty { padding: 24px; text-align: center; color: var(--dsw-alias-label-tertiary); font-size: 12.5px; }
 .smc-ns-bar { display: flex; gap: 4px; margin-bottom: 8px; }
 .smc-ns-btn { flex: 1; height: 26px; border: 1px solid var(--dsw-alias-border-l2); border-radius: 8px; background: none; color: var(--dsw-alias-label-secondary); font-size: 12px; cursor: pointer; font-family: inherit; }
@@ -303,10 +308,17 @@ interface McpServer {
   disabled: boolean
   fiberPhase: string | null
 }
+/** One tool a server contributes, as the surface lists it. */
+interface McpToolView {
+  name: string
+  description: string
+}
 interface McpServerStatus {
   serverName: string
   fiberPhase: string | null
   toolCount: number
+  /** Names + descriptions — a bare count doesn't say what the server offers. */
+  tools: McpToolView[]
   connected: boolean
   statusSource: 'seam' | 'derived'
 }
@@ -496,7 +508,7 @@ function SkillView() {
           <div className="smc-detail">
             <div className="smc-detail-row">
               <span className="smc-badge">{t('detailProvider')} · {s.provider}</span>
-              <span className="smc-badge">{s.source}</span>
+              <span className="smc-badge">{sourceLabel(s.source)}</span>
               {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
               {!s.writable && <span className="smc-badge disabled">{t('readOnlyBadge')}</span>}
               <span className="smc-spacer" />
@@ -710,6 +722,24 @@ function McpSidebarTab({ visible }: { visible: boolean }) {
               <span className="smc-srv-count">{s.toolCount} tools</span>
             </div>
             <div className="smc-srv-state">{state}</div>
+            {s.tools.length > 0 && (
+              <ul className="smc-tools">
+                {s.tools.map(tool => {
+                  // The wire name carries the server prefix (`mcp__<server>__<tool>`),
+                  // which is redundant inside the server's own card; keep the full
+                  // name on hover so it stays copyable.
+                  const short = tool.name.startsWith(`mcp__${s.serverName}__`)
+                    ? tool.name.slice(`mcp__${s.serverName}__`.length)
+                    : tool.name
+                  return (
+                    <li key={tool.name} className="smc-tool" title={tool.name}>
+                      <span className="smc-tool-name">{short}</span>
+                      {tool.description !== '' && <span className="smc-tool-desc">{tool.description}</span>}
+                    </li>
+                  )
+                })}
+              </ul>
+            )}
           </div>
         )
       })}
@@ -724,11 +754,23 @@ function Toast() {
 }
 
 // ---- sidebar skills tab (session-scoped: user + project skills) ----
+/** `plugin:@max-null/dsh-skills` → `plugin · dsh-skills`（面板里不必展开 scope 前缀）。 */
+function sourceLabel(source: string): string {
+  if (!source.startsWith('plugin:')) return source
+  const pkg = source.slice('plugin:'.length)
+  return `plugin · ${pkg.split('/').pop() ?? pkg}`
+}
+
 /** Namespace filter mirroring the dsh-memory sidebar: all / global / workspace. */
 type SkillNamespace = 'all' | 'global' | 'workspace'
 function skillInNamespace(s: SkillView, ns: SkillNamespace): boolean {
   if (ns === 'all') return true
-  if (ns === 'global') return s.source === 'user-dsh' || s.source === 'user-agents'
+  // Plugin-bundled skills (`plugin:<pkg>`) ship with the plugin and apply
+  // everywhere, so they are global-scoped — without this they matched neither
+  // namespace and appeared only under 全部.
+  if (ns === 'global') {
+    return s.source === 'user-dsh' || s.source === 'user-agents' || s.source.startsWith('plugin:')
+  }
   return s.source === 'project-dsh' || s.source === 'project-agents'
 }
 function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {

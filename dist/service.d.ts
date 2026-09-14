@@ -44,11 +44,23 @@ export interface McpServer {
     disabled: boolean;
     fiberPhase: string | null;
 }
+/** One tool a server contributes, as the management surface lists it. */
+export interface McpToolView {
+    name: string;
+    description: string;
+}
 /** Runtime status of one MCP server (sidebar polling). */
 export interface McpServerStatus {
     serverName: string;
     fiberPhase: string | null;
     toolCount: number;
+    /**
+     * The tools themselves. A bare count says nothing about what the server
+     * actually offers, so the surface lists names and descriptions too
+     * (2026-09-14 用户：MCP 的 tools 信息太少了，最好有名称和介绍）。
+     * Names come from `tools.schemas()`, which whitelists name/description.
+     */
+    tools: McpToolView[];
     connected: boolean;
     statusSource: 'seam' | 'derived';
 }
@@ -66,7 +78,25 @@ export declare class SkillMcpService extends Service {
     static inject: string[];
     private readonly officialSkillDirs;
     constructor(ctx: Context, config?: SkillConfig);
-    /** User-level skills plus, when a workspace is given, its project-level skills. */
+    /**
+     * Skill roots that live **inside loaded plugin packages**, i.e.
+     * `<node_modules>/<pkg>/skills`.
+     *
+     * The host-level skill filesystem is disabled in web-app (presets own
+     * discovery), so a plugin that ships skills — `@max-null/dsh-skills` and
+     * `@max-null/dsh-plugin-center` both do — keeps them on disk inside its own
+     * package, where no user-level root can see them. Without this the
+     * management surface showed 17 user skills while 8 plugin skills were loaded
+     * and in effect (2026-09-14 用户报「skill 生效但不展示」).
+     *
+     * Only **loaded** entries are probed, so this costs one existence check per
+     * plugin rather than a scan of the whole node_modules tree.
+     */
+    private pluginSkillDirs;
+    /**
+     * User-level skills, project-level skills for the given workspace, skills
+     * bundled inside loaded plugin packages, and any configured official roots.
+     */
     listSkills(cwd?: string): Promise<SkillView[]>;
     /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */
     toggleSkill(path: string): Promise<SkillView>;

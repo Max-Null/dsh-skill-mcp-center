@@ -9,9 +9,11 @@
 import { Service, type Context, type FiberState } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-tools'
+import { existsSync } from 'node:fs'
 import { readdir, readFile, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join, sep } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { parseSkillFrontmatter, setDisableModelInvocation } from './frontmatter.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -65,11 +67,24 @@ export interface McpServer {
   fiberPhase: string | null
 }
 
+/** One tool a server contributes, as the management surface lists it. */
+export interface McpToolView {
+  name: string
+  description: string
+}
+
 /** Runtime status of one MCP server (sidebar polling). */
 export interface McpServerStatus {
   serverName: string
   fiberPhase: string | null
   toolCount: number
+  /**
+   * The tools themselves. A bare count says nothing about what the server
+   * actually offers, so the surface lists names and descriptions too
+   * (2026-09-14 用户：MCP 的 tools 信息太少了，最好有名称和介绍）。
+   * Names come from `tools.schemas()`, which whitelists name/description.
+   */
+  tools: McpToolView[]
   connected: boolean
   statusSource: 'seam' | 'derived'
 }
@@ -114,6 +129,22 @@ const SKILL_ROOTS: readonly { path: string; source: string }[] = [
   { path: join(homedir(), '.dsh', 'skills'), source: 'user-dsh' },
   { path: join(homedir(), '.agents', 'skills'), source: 'user-agents' },
 ]
+
+/**
+ * This package's own `node_modules` directory — the tree every loaded plugin
+ * was resolved from.
+ *
+ * Derived from the module URL instead of assuming
+ * `$DSH_HOME/profiles/<p>/node_modules`: the profile layout and even the
+ * directory name vary, while this module is always inside that tree.
+ * @returns the node_modules path, or null when the module is not under one.
+ */
+function ownNodeModules(): string | null {
+  const here = fileURLToPath(import.meta.url)
+  const marker = `${sep}node_modules${sep}`
+  const at = here.lastIndexOf(marker)
+  return at < 0 ? null : here.slice(0, at + marker.length - 1)
+}
 
 /** Absolute SKILL.md path for one directory/file entry, or null. */
 function skillPathFor(root: string, name: string, isDirectory: boolean): string | null {
@@ -166,7 +197,37 @@ export class SkillMcpService extends Service {
     this.officialSkillDirs = config.officialSkillDirs ?? []
   }
 
-  /** User-level skills plus, when a workspace is given, its project-level skills. */
+  /**
+   * Skill roots that live **inside loaded plugin packages**, i.e.
+   * `<node_modules>/<pkg>/skills`.
+   *
+   * The host-level skill filesystem is disabled in web-app (presets own
+   * discovery), so a plugin that ships skills — `@max-null/dsh-skills` and
+   * `@max-null/dsh-plugin-center` both do — keeps them on disk inside its own
+   * package, where no user-level root can see them. Without this the
+   * management surface showed 17 user skills while 8 plugin skills were loaded
+   * and in effect (2026-09-14 用户报「skill 生效但不展示」).
+   *
+   * Only **loaded** entries are probed, so this costs one existence check per
+   * plugin rather than a scan of the whole node_modules tree.
+   */
+  private pluginSkillDirs(): { dir: string; label: string }[] {
+    const nm = ownNodeModules()
+    if (nm === null) return []
+    const out: { dir: string; label: string }[] = []
+    for (const entry of this.ctx.loader.entries()) {
+      const name = entry.options.name
+      if (typeof name !== 'string' || name === '' || name.startsWith('.') || name.startsWith('/')) continue
+      const dir = join(nm, ...name.split('/'), 'skills')
+      if (existsSync(dir)) out.push({ dir, label: `plugin:${name}` })
+    }
+    return out
+  }
+
+  /**
+   * User-level skills, project-level skills for the given workspace, skills
+   * bundled inside loaded plugin packages, and any configured official roots.
+   */
   async listSkills(cwd?: string): Promise<SkillView[]> {
     const skills: SkillView[] = []
     for (const root of SKILL_ROOTS) {
@@ -175,6 +236,9 @@ export class SkillMcpService extends Service {
     if (cwd !== undefined && cwd !== '') {
       skills.push(...await scanSkillRoot(join(cwd, '.agents', 'skills'), 'project-agents'))
       skills.push(...await scanSkillRoot(join(cwd, '.dsh', 'skills'), 'project-dsh'))
+    }
+    for (const plugin of this.pluginSkillDirs()) {
+      skills.push(...await scanSkillRoot(plugin.dir, plugin.label, false, 'plugin'))
     }
     for (const dir of this.officialSkillDirs) {
       skills.push(...await scanSkillRoot(dir, 'bundled', false, 'dsh-official'))
@@ -216,6 +280,7 @@ export class SkillMcpService extends Service {
     if (cwd !== undefined && cwd !== '') {
       roots.push(join(cwd, '.agents', 'skills'), join(cwd, '.dsh', 'skills'))
     }
+    for (const plugin of this.pluginSkillDirs()) roots.push(plugin.dir)
     roots.push(...this.officialSkillDirs)
     // Segment-boundary prefix check: a sibling directory like `skills-notes`
     // must not satisfy a `skills` root. join(root, '') normalizes to root.
@@ -280,6 +345,16 @@ export class SkillMcpService extends Service {
   /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
   async mcpStatus(): Promise<McpServerStatus[]> {
     const servers = await this.listMcpServers()
+    // Tool identity always comes from the mounted tool table — `schemas()`
+    // whitelists name/description, which is exactly what the surface needs.
+    // The seam, when present, only refines the count and connection facts.
+    const schemas = this.ctx.tools.schemas()
+    const toolsOf = (serverName: string): McpToolView[] => {
+      const prefix = `mcp__${serverName}__`
+      return schemas
+        .filter(s => s.name.startsWith(prefix))
+        .map(s => ({ name: s.name, description: s.description ?? '' }))
+    }
     const seam = (this.ctx as Context).get(
       'mcpStatus',
     ) as { list(): { serverName: string; phase: string; toolCount: number }[] } | undefined
@@ -287,24 +362,25 @@ export class SkillMcpService extends Service {
       const byName = new Map(seam.list().map(s => [s.serverName, s]))
       return servers.map(s => {
         const st = byName.get(s.serverName)
+        const tools = toolsOf(s.serverName)
         return {
           serverName: s.serverName,
           fiberPhase: s.fiberPhase,
-          toolCount: st?.toolCount ?? 0,
+          toolCount: st?.toolCount ?? tools.length,
+          tools,
           connected: st?.phase === 'connected',
           statusSource: 'seam',
         }
       })
     }
-    const toolNames = this.ctx.tools.schemas().map(s => s.name)
     return servers.map(s => {
-      const prefix = `mcp__${s.serverName}__`
-      const toolCount = toolNames.filter(n => n.startsWith(prefix)).length
+      const tools = toolsOf(s.serverName)
       return {
         serverName: s.serverName,
         fiberPhase: s.fiberPhase,
-        toolCount,
-        connected: !s.disabled && s.fiberPhase === 'active' && toolCount > 0,
+        toolCount: tools.length,
+        tools,
+        connected: !s.disabled && s.fiberPhase === 'active' && tools.length > 0,
         statusSource: 'derived',
       }
     })
