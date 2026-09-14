@@ -17,13 +17,23 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 
 ## 截图
 
-装完后在设置里多出「Skill & MCP」一项，可控制各模型对 Skill/MCP 的可见性：
+### 设置页：集中管理
 
-**入口：** 设置 → Skill & MCP
+装完后设置里多出「Skill & MCP」一项，可逐条控制各模型对 Skill/MCP 的可见性。**入口：** 设置 → Skill & MCP
 
-| 设置入口与面板 |
-|---|
-| ![设置 → Skill & MCP](docs/shots/skill-mcp-1.png) |
+![设置 → Skill & MCP](docs/shots/skill-mcp-1.png)
+
+### 侧栏：Skill 一览
+
+搜索 + 命名空间筛选（全部 / 全局 / 工作区），每条带开关与 `MD`（查看 SKILL.md）。**插件包内自带的 skill 同样列出**，并标出来源插件——下图里 8 个 `ssid-*` 来自 `dsh-skills`，而用户级的 `ssid-release` 没有来源标签，这正是两者的区别：
+
+![侧栏 Skill 面板](docs/shots/sidebar-skills.png)
+
+### 侧栏：MCP 状态与工具
+
+每个 `mcp-client` 服务器的连接状态与工具数；**点服务器行展开**工具清单（默认收起，避免几十个工具占满面板）。工具名取自工具表、描述取自 `tools.schemas()`，冗余的 `mcp__<server>__` 前缀隐去（全名留在 hover）：
+
+![侧栏 MCP 面板](docs/shots/sidebar-mcp.png)
 
 
 ## Install / 安装
