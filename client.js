@@ -933,13 +933,14 @@ function apply(ctx) {
     sidebarCtx.effect(() => service.registerTab({
       id: "@max-null/dsh-skill-mcp-center:mcp",
       title: () => "MCP",
-      // 图标风格对齐 better-sidebar 内置 tab：彩色线性、14px（内置各自硬编码品牌色、
-      // 不跟随主题）；原先 15px + currentColor 比内置偏大发灰（2026-09-14 用户要求）。
+      // 图标风格对齐 DSH 原生右栏：彩色线性、22px（「开始」页的图标容器
+      // .geFEbW_entryIcon 是 26px、自带占位图标 22px，整列基准即 22 ——
+      // 2026-09-14 用户指「尺寸 14 不太对，其他都在 22 左右」）。
       // **必须是返回 ReactNode 的函数**：DSH 原生右侧栏只认函数形式，直接传 JSX 元素
       // 会被忽略并回落到它的占位图标（`geFEbW_placeholder`，22px 灰圆）——
       // 2026-09-14 实测：同一份 icon 在 better-sidebar 自绘的底部工作台里正常显示，
       // 在原生右栏「开始」页却是占位符，据此定位到形式差异。
-      icon: () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "#4d6bfe", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
+      icon: () => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#4d6bfe", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2", y: "2", width: "20", height: "8", rx: "2", ry: "2" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("rect", { x: "2", y: "14", width: "20", height: "8", rx: "2", ry: "2" }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("line", { x1: "6", y1: "6", x2: "6.01", y2: "6" }),
@@ -953,7 +954,7 @@ function apply(ctx) {
       id: "@max-null/dsh-skill-mcp-center:skills",
       title: () => "Skill",
       // 同上：必须是返回 ReactNode 的函数（DSH 原生右栏只认函数形式，传元素会回落占位图标）
-      icon: () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "14", height: "14", viewBox: "0 0 24 24", fill: "none", stroke: "#f59e0b", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M13 2 3 14h7l-1 8 10-12h-7l1-8z" }) }),
+      icon: () => /* @__PURE__ */ (0, import_jsx_runtime.jsx)("svg", { width: "22", height: "22", viewBox: "0 0 24 24", fill: "none", stroke: "#f59e0b", strokeWidth: "2", strokeLinecap: "round", strokeLinejoin: "round", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M13 2 3 14h7l-1 8 10-12h-7l1-8z" }) }),
       order: 71,
       single: true,
       component: (props) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(SidebarSkillTab, { visible: props.visible, cwd: props.scope?.cwd })
