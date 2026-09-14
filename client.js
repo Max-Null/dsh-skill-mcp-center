@@ -100,7 +100,8 @@ var CSS = `
 .smc-search-sidebar { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 100%; font-family: inherit; box-sizing: border-box; }
 .smc-search-sidebar:focus { border-color: var(--dsw-alias-state-business-primary); }
 .smc-search-sidebar::placeholder { color: var(--dsw-alias-label-caption); }
-.smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; }
+.smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; width: 100%; box-sizing: border-box; border: none; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.smc-srv .smc-chevron { margin: 0 2px 0 4px; }
 .smc-srv:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
 .smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
@@ -726,6 +727,7 @@ function CenterPanel() {
 function McpSidebarTab({ visible }) {
   useLocale();
   const [items, setItems] = (0, import_react.useState)([]);
+  const [openIds, setOpenIds] = (0, import_react.useState)(() => /* @__PURE__ */ new Set());
   (0, import_react.useEffect)(() => {
     if (!visible) return;
     const tick = () => {
@@ -740,21 +742,44 @@ function McpSidebarTab({ visible }) {
       clearInterval(timer);
     };
   }, [visible]);
+  const toggle = (name) => {
+    setOpenIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(name)) next.delete(name);
+      else next.add(name);
+      return next;
+    });
+  };
   if (items.length === 0) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noMcpServer") });
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar", children: items.map((s) => {
     const dotCls = s.fiberPhase === "failed" ? " failed" : s.connected ? "" : " idle";
     const state = s.fiberPhase === "failed" ? t("failed") : s.connected ? t("connected") : t("notSynced");
+    const expandable = s.tools.length > 0;
+    const open = expandable && openIds.has(s.serverName);
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `fiber ${s.fiberPhase ?? "?"} \xB7 ${s.toolCount} tools (${s.statusSource})`, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${dotCls}` }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.serverName }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "smc-srv-count", children: [
-          s.toolCount,
-          " tools"
-        ] })
-      ] }),
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
+        "button",
+        {
+          type: "button",
+          className: "smc-srv",
+          title: `fiber ${s.fiberPhase ?? "?"} \xB7 ${s.toolCount} tools (${s.statusSource})`,
+          "aria-expanded": expandable ? open : void 0,
+          onClick: () => {
+            if (expandable) toggle(s.serverName);
+          },
+          children: [
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${dotCls}` }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.serverName }),
+            /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("span", { className: "smc-srv-count", children: [
+              s.toolCount,
+              " tools"
+            ] }),
+            expandable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-chevron${open ? " open" : ""}` })
+          ]
+        }
+      ),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-state", children: state }),
-      s.tools.length > 0 && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "smc-tools", children: s.tools.map((tool) => {
+      open && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("ul", { className: "smc-tools", children: s.tools.map((tool) => {
         const short = tool.name.startsWith(`mcp__${s.serverName}__`) ? tool.name.slice(`mcp__${s.serverName}__`.length) : tool.name;
         return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("li", { className: "smc-tool", title: tool.name, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-tool-name", children: short }),

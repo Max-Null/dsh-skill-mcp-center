@@ -76,7 +76,8 @@ const CSS = `
 .smc-search-sidebar { height: 28px; padding: 0 12px; border-radius: 18px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-base); color: var(--dsw-alias-label-primary); font-size: 13px; outline: none; width: 100%; font-family: inherit; box-sizing: border-box; }
 .smc-search-sidebar:focus { border-color: var(--dsw-alias-state-business-primary); }
 .smc-search-sidebar::placeholder { color: var(--dsw-alias-label-caption); }
-.smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; }
+.smc-srv { display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 8px; width: 100%; box-sizing: border-box; border: none; background: none; font: inherit; color: inherit; text-align: left; cursor: pointer; }
+.smc-srv .smc-chevron { margin: 0 2px 0 4px; }
 .smc-srv:hover { background: var(--dsw-alias-interactive-bg-hover); }
 .smc-srv-name { font-size: 13px; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--dsw-alias-label-primary); }
 .smc-srv-desc { font-size: 11px; color: var(--dsw-alias-label-tertiary); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin: 0 10px 4px 26px; flex: none; }
@@ -701,6 +702,11 @@ function CenterPanel() {
 function McpSidebarTab({ visible }: { visible: boolean }) {
   useLocale()
   const [items, setItems] = useState<McpServerStatus[]>([])
+  // Servers whose tool list is expanded, collapsed by default: a server can
+  // expose dozens of tools, and this tab exists for at-a-glance status —
+  // the names/descriptions are reference material you open on demand
+  // (2026-09-14 用户要求「默认收起 tool 列表、点开再展开」).
+  const [openIds, setOpenIds] = useState<ReadonlySet<string>>(() => new Set())
   useEffect(() => {
     if (!visible) return
     const tick = (): void => { void rpc('mcpStatus').then(v => { setItems(v as McpServerStatus[]) }).catch(() => {}) }
@@ -708,21 +714,38 @@ function McpSidebarTab({ visible }: { visible: boolean }) {
     const timer = setInterval(tick, 1000)
     return () => { clearInterval(timer) }
   }, [visible])
+  const toggle = (name: string): void => {
+    setOpenIds(prev => {
+      const next = new Set(prev)
+      if (next.has(name)) next.delete(name)
+      else next.add(name)
+      return next
+    })
+  }
   if (items.length === 0) return <div className="smc-empty">{t('noMcpServer')}</div>
   return (
     <div className="smc-sidebar">
       {items.map(s => {
         const dotCls = s.fiberPhase === 'failed' ? ' failed' : (s.connected ? '' : ' idle')
         const state = s.fiberPhase === 'failed' ? t('failed') : (s.connected ? t('connected') : t('notSynced'))
+        const expandable = s.tools.length > 0
+        const open = expandable && openIds.has(s.serverName)
         return (
           <div key={s.serverName}>
-            <div className="smc-srv" title={`fiber ${s.fiberPhase ?? '?'} · ${s.toolCount} tools (${s.statusSource})`}>
+            <button
+              type="button"
+              className="smc-srv"
+              title={`fiber ${s.fiberPhase ?? '?'} · ${s.toolCount} tools (${s.statusSource})`}
+              aria-expanded={expandable ? open : undefined}
+              onClick={() => { if (expandable) toggle(s.serverName) }}
+            >
               <span className={`smc-dot${dotCls}`} />
               <span className="smc-srv-name">{s.serverName}</span>
               <span className="smc-srv-count">{s.toolCount} tools</span>
-            </div>
+              {expandable && <span className={`smc-chevron${open ? ' open' : ''}`} />}
+            </button>
             <div className="smc-srv-state">{state}</div>
-            {s.tools.length > 0 && (
+            {open && (
               <ul className="smc-tools">
                 {s.tools.map(tool => {
                   // The wire name carries the server prefix (`mcp__<server>__<tool>`),
