@@ -33,7 +33,7 @@ const CSS = `
 .smc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .smc-spacer { flex: 1; }
 
-.smc-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 17px; white-space: nowrap; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
+.smc-badge { display: inline-flex; align-items: center; flex: none; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 17px; white-space: nowrap; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
 .smc-badge.user { background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-state-business-primary); }
 .smc-badge.workspace { background: var(--dsw-alias-state-success-tertiary); color: var(--dsw-alias-state-success-primary); }
 .smc-badge.bundled { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-tertiary); }
@@ -777,11 +777,15 @@ function Toast() {
 }
 
 // ---- sidebar skills tab (session-scoped: user + project skills) ----
-/** `plugin:@max-null/dsh-skills` → `plugin · dsh-skills`（面板里不必展开 scope 前缀）。 */
-function sourceLabel(source: string): string {
+/**
+ * `plugin:@max-null/dsh-skills` → `plugin · dsh-skills`（面板里不必展开 scope 前缀）；
+ * `short` 时只留包名——侧栏那行还要放 MD 按钮与开关，宽度紧张。
+ */
+function sourceLabel(source: string, short = false): string {
   if (!source.startsWith('plugin:')) return source
   const pkg = source.slice('plugin:'.length)
-  return `plugin · ${pkg.split('/').pop() ?? pkg}`
+  const name = pkg.split('/').pop() ?? pkg
+  return short ? name : `plugin · ${name}`
 }
 
 /** Namespace filter mirroring the dsh-memory sidebar: all / global / workspace. */
@@ -856,8 +860,10 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                 <div className="smc-srv" title={`${s.description}\n${s.path}`}>
                   <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
                   <span className="smc-srv-name">{s.name}</span>
-                  {!s.modelInvocable && <span className="smc-srv-count">{t('modelDisabled')}</span>}
-                  {!s.writable && <span className="smc-srv-count">{t('readOnlyBadge')}</span>}
+                  {!s.modelInvocable && <span className="smc-badge">{t('modelDisabled')}</span>}
+                  {/* 来源标签取代原先的「内置只读」：不可写时，读者更想知道它属于哪个
+                      插件（读不出信息量的「只读」已由禁用的开关表达）。2026-09-14 用户要求。 */}
+                  {!s.writable && <span className="smc-badge">{sourceLabel(s.source, true)}</span>}
                   <button
                     type="button"
                     className="smc-btn"

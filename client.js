@@ -57,7 +57,7 @@ var CSS = `
 .smc-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; margin-top: 10px; }
 .smc-spacer { flex: 1; }
 
-.smc-badge { display: inline-flex; align-items: center; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 17px; white-space: nowrap; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
+.smc-badge { display: inline-flex; align-items: center; flex: none; padding: 1px 8px; border-radius: 999px; font-size: 11px; font-weight: 500; line-height: 17px; white-space: nowrap; background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-secondary); }
 .smc-badge.user { background: var(--dsw-alias-state-business-tertiary); color: var(--dsw-alias-state-business-primary); }
 .smc-badge.workspace { background: var(--dsw-alias-state-success-tertiary); color: var(--dsw-alias-state-success-primary); }
 .smc-badge.bundled { background: var(--dsw-alias-bg-module-platform); color: var(--dsw-alias-label-tertiary); }
@@ -794,10 +794,11 @@ function Toast() {
   if (toast === null) return null;
   return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: `smc-toast ${toast.kind}`, children: toast.message });
 }
-function sourceLabel(source) {
+function sourceLabel(source, short = false) {
   if (!source.startsWith("plugin:")) return source;
   const pkg = source.slice("plugin:".length);
-  return `plugin \xB7 ${pkg.split("/").pop() ?? pkg}`;
+  const name = pkg.split("/").pop() ?? pkg;
+  return short ? name : `plugin \xB7 ${name}`;
 }
 function skillInNamespace(s, ns) {
   if (ns === "all") return true;
@@ -884,8 +885,8 @@ function SidebarSkillTab({ visible, cwd }) {
 ${s.path}`, children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
-        !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-count", children: t("modelDisabled") }),
-        !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-count", children: t("readOnlyBadge") }),
+        !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: t("modelDisabled") }),
+        !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: sourceLabel(s.source, true) }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
