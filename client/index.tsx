@@ -906,7 +906,26 @@ function apply(ctx: {
 }): void {
   injectCss()
   rpc = async (endpoint: string, payload: unknown = {}): Promise<unknown> => {
-    const result = await ctx.connection.rpc.call('/skill-mcp', endpoint, payload)
+    // Transport: one exact POST route under the shared `/api` channel (host
+    // registers it through `connection.fetch.register`). The previous
+    // `ctx.connection.rpc.call('/skill-mcp', …)` depended on a host-side channel
+    // registration that throws in the web (source) composition of DSH
+    // 0.1.5-rc.2 (`cannot get property "webServer" without inject`), which left
+    // this panel reporting HTTP 405.
+    const response = await fetch('/api/skill-mcp', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ endpoint, payload }),
+    })
+    if (response.status === 404) {
+      // Older host: it exposes only the logical-channel registry, so fall back
+      // to the shipped call path there.
+      const legacy = await ctx.connection.rpc.call('/skill-mcp', endpoint, payload)
+      if (legacy.ok) return legacy.value
+      throw new Error(legacy.error?.message ?? `skill-mcp-center: ${endpoint} failed`)
+    }
+    if (!response.ok) throw new Error(`skill-mcp-center: ${endpoint} failed (HTTP ${response.status})`)
+    const result = await response.json()
     if (result.ok) return result.value
     throw new Error(result.error?.message ?? `skill-mcp-center: ${endpoint} failed`)
   }

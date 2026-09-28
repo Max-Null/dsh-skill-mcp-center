@@ -924,7 +924,18 @@ var inject = ["slots", "connection", "locale"];
 function apply(ctx) {
   injectCss();
   rpc = async (endpoint, payload = {}) => {
-    const result = await ctx.connection.rpc.call("/skill-mcp", endpoint, payload);
+    const response = await fetch("/api/skill-mcp", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ endpoint, payload })
+    });
+    if (response.status === 404) {
+      const legacy = await ctx.connection.rpc.call("/skill-mcp", endpoint, payload);
+      if (legacy.ok) return legacy.value;
+      throw new Error(legacy.error?.message ?? `skill-mcp-center: ${endpoint} failed`);
+    }
+    if (!response.ok) throw new Error(`skill-mcp-center: ${endpoint} failed (HTTP ${response.status})`);
+    const result = await response.json();
     if (result.ok) return result.value;
     throw new Error(result.error?.message ?? `skill-mcp-center: ${endpoint} failed`);
   };
