@@ -8,7 +8,7 @@
  */
 import { Service } from '@deepseek-ai/cordis';
 import { existsSync } from 'node:fs';
-import { readdir, readFile, writeFile } from 'node:fs/promises';
+import { readdir, readFile, stat, writeFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import { join, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -65,16 +65,45 @@ function ownNodeModules() {
     const at = here.lastIndexOf(marker);
     return at < 0 ? null : here.slice(0, at + marker.length - 1);
 }
-/** Absolute SKILL.md path for one directory/file entry, or null. */
-function skillPathFor(root, name, isDirectory) {
+/**
+ * Absolute SKILL.md path for one root entry, or null when the entry is neither
+ * a directory nor a Markdown file.
+ *
+ * `readdir`'s Dirent reports lstat semantics: a Windows directory junction —
+ * and equally a POSIX symlink to a directory — is `isDirectory() === false`
+ * with `isSymbolicLink() === true`, so the Dirent alone cannot tell a linked
+ * directory from a plain file. Only entries the Dirent leaves open reach the
+ * `stat` probe, which follows the link to its target type and so keeps the
+ * common true-directory case at zero extra syscalls. A broken link fails that
+ * probe (ENOENT) and yields null rather than a path nothing can read.
+ * @param root - directory being scanned.
+ * @param entry - one `readdir(root, { withFileTypes: true })` entry.
+ * @returns the SKILL.md path this entry names, or null when it names no skill.
+ */
+async function skillPathFor(root, entry) {
+    const full = join(root, entry.name);
+    let isDirectory = entry.isDirectory();
+    if (!isDirectory && !entry.isFile()) {
+        try {
+            isDirectory = (await stat(full)).isDirectory();
+        }
+        catch {
+            return null; // broken link: the target is gone
+        }
+    }
     if (isDirectory)
-        return join(root, name, 'SKILL.md');
-    if (name.endsWith('.md'))
-        return join(root, name);
-    return null;
+        return join(full, 'SKILL.md');
+    return entry.name.endsWith('.md') ? full : null;
 }
-/** Scan one root for SKILL.md entries and parse their frontmatter. */
-async function scanSkillRoot(root, source, writable = true, provider = 'filesystem') {
+/**
+ * Scan one root for SKILL.md entries and parse their frontmatter.
+ * @param root - directory to scan; a missing root yields no skills.
+ * @param source - discovery source label recorded on every skill found.
+ * @param writable - whether the surface may rewrite these SKILL.md files.
+ * @param provider - provider label recorded on every skill found.
+ * @returns the skills this root contributes, in directory order.
+ */
+export async function scanSkillRoot(root, source, writable = true, provider = 'filesystem') {
     let entries;
     try {
         entries = await readdir(root, { withFileTypes: true });
@@ -84,7 +113,7 @@ async function scanSkillRoot(root, source, writable = true, provider = 'filesyst
     }
     const skills = [];
     for (const entry of entries) {
-        const skillPath = skillPathFor(root, entry.name, entry.isDirectory());
+        const skillPath = await skillPathFor(root, entry);
         if (skillPath === null)
             continue;
         let text;

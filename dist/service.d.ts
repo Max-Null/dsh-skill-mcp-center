@@ -74,6 +74,15 @@ export interface McpConfig {
     url?: string;
     headers?: Record<string, string>;
 }
+/**
+ * Scan one root for SKILL.md entries and parse their frontmatter.
+ * @param root - directory to scan; a missing root yields no skills.
+ * @param source - discovery source label recorded on every skill found.
+ * @param writable - whether the surface may rewrite these SKILL.md files.
+ * @param provider - provider label recorded on every skill found.
+ * @returns the skills this root contributes, in directory order.
+ */
+export declare function scanSkillRoot(root: string, source: string, writable?: boolean, provider?: string): Promise<SkillView[]>;
 export declare class SkillMcpService extends Service {
     static inject: string[];
     private readonly officialSkillDirs;
