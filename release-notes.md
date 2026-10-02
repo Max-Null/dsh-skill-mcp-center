@@ -1,5 +1,25 @@
 # Release Notes — @max-null/dsh-skill-mcp-center
 
+## 0.5.3 (2026-10-02)
+
+### 修复
+
+- **Windows 下技能列表整体为空**。`~/.dsh/skills` 下的条目是目录 junction 或符号
+  链接时，`scanSkillRoot()` 拿 `Dirent.isDirectory()` 当形态判据——而 Dirent 是
+  lstat 语义，junction 报 `isDirectory() === false` / `isSymbolicLink() === true`，
+  于是 `skillPathFor()` 返回 null，每个链接型技能在 `continue` 处被丢弃。技能本身
+  完好可读，只是扫不到，面板上表现为列表为空。
+
+  判据改为**分层**：Dirent 能明确作答时直接采信（真目录走 `isDirectory()`、真文件
+  走 `isFile()`），只有链接与文件系统报 `DT_UNKNOWN` 的形态才跟随一次 `stat`。真
+  目录因此仍是零额外系统调用。断链在 `stat` 处失败即跳过，同根其它技能不受影响。
+  这不是 Windows 专用分支——junction 与 POSIX 符号链接走同一条路。
+
+### 兼容性
+
+- 无接口变更：`listSkills()` 的出入参、端点集合与请求信封均未改，只是扫描判据放宽。
+  新增 5 条单测覆盖真目录 / `.md` 文件 / 链接指向目录 / 断链 / 非技能条目。
+
 ## 0.5.2 (2026-09-29)
 
 ### 变更
