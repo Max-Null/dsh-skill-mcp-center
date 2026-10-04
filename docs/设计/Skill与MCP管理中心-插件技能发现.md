@@ -119,6 +119,52 @@ config:
 2. **可写性**：跨树找到的技能，面板上的开关要不要能改它？若要，改的应该是**实际生效的那一份**，而不是搜到的那一份。
 3. **`bundledSkillDir` 的定性尚未确认**：它是第三方插件的自定义约定，还是 DSH 官方约定？把扫描判据建立在一个非官方字段上之前，值得先确认 DSH 侧有没有对应概念。（**这一条是转述 + 待确认，写文档时未复核。**）
 
+## 热插拔：待决 2 的机制与实测（2026-10-04）
+
+待决 2 问的是「跨树找到的技能，面板开关要不要能改它；若要，改的应该是实际生效的那一份」。包内技能是只读的安装内容 —— 改名、移出目录、增删链接这些社区通用手法在这里全都无效。机制答案在 registry 的 **rank 遮蔽**。
+
+### 社区现状
+
+七家同定位项目的启停**全是文件或链接层操作**，无一家覆盖插件包内技能：
+
+| 项目 | ★ | 启停机制 | 覆盖包内技能 |
+|---|---|---|---|
+| `Fishquito7/dsh-skill-mcp-panel` | 174 | `SKILL.md` → `SKILL.md.disabled` 改名 | 否，README 明说 bundled 只读 |
+| `VDERR/dsh-echocat-skill-panel` | 196 | 把目录移出 DSH 监视的 skills 目录 | 否 |
+| `MichengAI/dsh-skills-manager` | 92 | 增删链接，源目录不动 | 否（其 `readonly-discovery` 是「只读扫描」，不是「只读技能」） |
+| `peiqi10086/dsh-skills-market` | 9 | 侧边栏管理本地 skills | 否，描述里写「内置只读」 |
+
+`zebbkira/dsh-skills-mcp-manager`（23）与 `minivv/dsh-agent-skills`（16）只核了描述未读实现；`NanmiCoder/dsh-skills-hub`（16）是装卸类，不涉及启停。
+
+### registry 侧的三条事实
+
+1. **`ctx.skills.register()` 是官方有意保留的第三方扩展点。** `.agents/notes/rejected/simplification/2026-07-12-prune-unused-skill-registry-api.md` 曾以「zero production caller」为由提议删除它，**被拒**；状态行原文：`rejected — Direct runtime skill registration is an intentional extension path for third-party plugins.` 那个理由如今也已不成立 —— `Tencent/BrowserSkill`、`modelstudioai/cli`、`zilliztech/memsearch` 都在用它发布技能。
+2. **同 layer 内 rank 小者赢。** `RUNTIME_RANK = 250`（`packages/skill/skill/src/index.ts:25`），包内 provider 更高（`dsh-skills` ≈550），`BUNDLED_SKILL_RANK = 600`（已导出）。跨 layer 是「最近的 layer 直接赢」而不看 rank —— 但 host 行与仓库插件都落 global layer（见 `archived/architecture/2026-08-09-layered-skill-registry.md`），所以 rank 适用。
+3. **`{modelInvocable: false, userInvocable: false}` 是被支持的象限**，且 `ctx.skills.get()` 刻意不做策略过滤 —— 官方给的理由正是：在那里过滤会让这个象限**无法被查看和管理**（`implemented/feature/2026-07-28-skill-invocation-policy.md`）。
+
+### 实测
+
+隔离实例里用一个探针插件注册同名占位技能（两个 invocation 都为 false），分三步读 `ctx.skills.list()`：
+
+```
+baseline        provider=bundled-probe-skill  source=bundled  invocation={model:true,  user:true}
+after-register  provider=runtime              source=runtime  invocation={model:false, user:false}
+after-dispose   provider=bundled-probe-skill  source=bundled  invocation={model:true,  user:true}
+```
+
+遮蔽成立、且完全可逆。技能**不会从 catalog 消失，只是换拥有者** —— 对模型侧与用户侧都不可调用，但仍可被面板列出与管理。
+
+### 因此「停用」的形态
+
+- **停用** —— `ctx.skills.register()` 一个同名、两个 invocation 均为 false 的占位技能（rank 250 赢过包内那份）
+- **启用** —— 调它的 disposer
+- 全程不写磁盘、不重启、即时生效，补上了 packaged provider「目录增删要等插件重新加载」的短板
+
+### 实现前仍要定的两件事
+
+1. **禁用清单存在哪。** registry **不提供查看「被遮蔽定义」的 API**（`2026-08-09` 那篇的 Consequences 明写 `The registry still exposes no API to inspect shadowed definitions`），所以面板必须自持一份清单并在启动时重放，否则重启即失忆。
+2. **遮蔽的语义是「整条让位」。** 占位技能会顶掉正文，`ctx.skills.get(name)` 拿到的也是占位的空 body。面板的「查看原文」因此只能走自己的磁盘读取 —— 现有架构（直接扫盘、不经 registry）恰好就是这样，不必改。
+
 ## 相关
 
 - issue：[#1](https://github.com/Max-Null/dsh-skill-mcp-center/issues/1)
