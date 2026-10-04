@@ -83,13 +83,55 @@ export interface McpConfig {
  * @returns the skills this root contributes, in directory order.
  */
 export declare function scanSkillRoot(root: string, source: string, writable?: boolean, provider?: string): Promise<SkillView[]>;
+/** The loader-entry fields plugin skill discovery reads. */
+export interface SkillRootEntry {
+    readonly options: {
+        readonly id: string;
+        readonly name: string;
+    };
+    /** Absent while the entry is disabled, incompatible, or still loading. */
+    readonly fiber?: {
+        readonly config: unknown;
+    } | undefined;
+}
+/**
+ * Skill roots contributed by loaded plugin packages.
+ *
+ * Two declarations reach such a directory, and both are needed:
+ *
+ * - the entry's module specifier, i.e. `<node_modules>/<pkg>/skills` — how
+ *   `@max-null/dsh-skills` and `@max-null/dsh-plugin-center` ship theirs;
+ * - the entry's own `bundledSkillDir` config — the only way to see a plugin
+ *   that mounts the official `@deepseek-ai/dsh-skill-filesystem` under an id
+ *   of its own. `dsh-plugin-zhihu-search` is the live sample: it registers
+ *   `name: '@deepseek-ai/dsh-skill-filesystem'`, and its `skills/` sits in a
+ *   different `node_modules` tree than this plugin's.
+ *
+ * `bundledSkillDir` is read from the **fiber**, never from
+ * `entry.options.config`. A patch may compute the value with a `!!js`
+ * expression, and the Loader keeps that expression as a `{ __jsExpr }` node
+ * in the stored options while handing the owning fiber the evaluated copy —
+ * it interpolates on the `internal/config` waterfall and writes the raw node
+ * back on `internal/update` specifically so file write-back preserves the
+ * `!!js` form. The stored value is therefore an expression node rather than a
+ * path, and reading it can only miss.
+ *
+ * Only **loaded** entries are probed, so this costs a couple of existence
+ * checks per plugin instead of a scan of the whole `node_modules` tree.
+ * @param entries - loaded loader entries.
+ * @param nodeModules - this package's own `node_modules` tree, or null.
+ * @returns the skill roots that exist, deduplicated, in entry order.
+ */
+export declare function pluginSkillRoots(entries: Iterable<SkillRootEntry>, nodeModules: string | null): {
+    dir: string;
+    label: string;
+}[];
 export declare class SkillMcpService extends Service {
     static inject: string[];
     private readonly officialSkillDirs;
     constructor(ctx: Context, config?: SkillConfig);
     /**
-     * Skill roots that live **inside loaded plugin packages**, i.e.
-     * `<node_modules>/<pkg>/skills`.
+     * Skill roots that live **inside loaded plugin packages**.
      *
      * The host-level skill filesystem is disabled in web-app (presets own
      * discovery), so a plugin that ships skills — `@max-null/dsh-skills` and
@@ -97,9 +139,6 @@ export declare class SkillMcpService extends Service {
      * package, where no user-level root can see them. Without this the
      * management surface showed 17 user skills while 8 plugin skills were loaded
      * and in effect (2026-09-14 用户报「skill 生效但不展示」).
-     *
-     * Only **loaded** entries are probed, so this costs one existence check per
-     * plugin rather than a scan of the whole node_modules tree.
      */
     private pluginSkillDirs;
     /**

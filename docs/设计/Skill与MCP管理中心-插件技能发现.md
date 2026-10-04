@@ -3,10 +3,48 @@
 > 交接文档 · 2026-10-04 落盘。来源：GitHub issue [Max-Null/dsh-skill-mcp-center#1](https://github.com/Max-Null/dsh-skill-mcp-center/issues/1)（**OPEN，有意保留**，其余 8 条同日归档）。
 >
 > **本文自包含**：读完即可开工，不必回溯原会话。事实依据来自 2026-10-02 的机械取证（当时未实现改动），文末标注了哪些是转述、哪些待确认。
+>
+> **2026-10-04 结案**：方案 A 已实施。下面的推导记录保留（它解释了当初为什么这么选），当前状态见下节。
+
+## 状态（2026-10-04 结案）
+
+**判据一已修**，并查实了本文原先没有的**第三层原因**。
+
+原文描述是「拿 `entry.options.name` 拼路径会落空」。实际情况更彻底：**即使说明符恰好就是包名，也照样扫不到** —— `bundledSkillDir` 在 `entry.options.config` 里保留的是 `!!js` 表达式节点（`{ __jsExpr: '...' }`），**不是路径**。Loader 只把求值后的副本交给 entry 的 fiber：它在 `internal/config` 瀑布上 `interpolate`，在 `internal/update` 上回写原始节点以保持文件里的 `!!js` 形态（`vendor/loader/src/index.ts`；`packages/boot/app-boot/tests/user-patches.spec.ts:198-199` 对此有直接断言）。
+
+所以真正的判据不是「拼错了包名」，而是「读错了字段」。
+
+实现落在 `src/service.ts` 的 `pluginSkillRoots()`：两条声明都探 —— 说明符拼出的 `<node_modules>/<pkg>/skills`，以及 fiber 上求值后的 `bundledSkillDir` —— 并对同一目录去重。
+
+### 三个待决问题
+
+| # | 问题 | 结论 |
+|---|---|---|
+| 1 | 面板要覆盖「当前 profile 实际加载的」还是「所有可发现的」 | **实现天然落在前者**。`bundledSkillDir` 由插件自己的 patch 算出，指向它真正加载的那一份；两条声明都以**已加载的 entry**为准，没有「扫所有已知树」这一步 |
+| 2 | 跨树找到的技能，开关要不要能改它 | **仍开放**。插件技能一律 `writable: false`（只读展示），本次未动 |
+| 3 | `bundledSkillDir` 是官方约定还是第三方自定义 | **官方**。`packages/skill/skill-filesystem/src/index.ts:73` 定义配置项、:261 按 rank 600 注册为 `bundled` 源；`docs/subsystems/skills.md:75` 与同包 `README.md:75` 均列为公开配置，另有 `DSH_BUNDLED_SKILL_DIR` 环境变量默认值 |
+
+### 验证到什么程度
+
+**机制**由真 cordis + 真 Loader 的集成测试覆盖（`tests/bundled-skill-dir-loader.test.ts`：options 上是节点、fiber 上是求值后的路径、`pluginSkillRoots` 对真 Entry 输出正确）。
+
+**端到端**在隔离 dev 实例里做了 A/B 对照（2026-10-04）。样本与 `dsh-plugin-zhihu-search` 同构：`dsh-plugin/cordis.patch.yml` 里用 `!!js` 借 Loader 的 `baseUrl` 解析自身包位置，插一条官方 `@deepseek-ai/dsh-skill-filesystem`（`bundledSkillDir` 指向自带 `skills/`），另插一条只负责报告 config 的 echo 插件。
+
+第二条 entry 是必需的：它把「bundle 已挂载但旧代码扫不到」与「bundle 压根没挂载」分开 —— 少了它，A 组的「扫不到」有两种读法，结论正好相反。
+
+| | 插件代码 | 样本 | echo 探针 | 技能数 | 面板里的样本技能 |
+|---|---|---|---|---|---|
+| A | 0.5.3（旧） | 已挂载 | 打印 `typeof=string` + 绝对路径 | 29 | 无 |
+| B | 本次改动 | 已挂载 | 同上 | 30 | `bundled-probe`，源 `plugin:bundled-probe-skill` |
+
+同一环境、同一样本，唯一变量是插件代码；两次探针输出一致，说明差异来自代码而非环境。两条 entry 指向同一目录而技能只出现一次，去重同时得到验证。
+
+**未做**：装版端到端。真实的 `dsh-plugin-zhihu-search` 只在装版 profile（`~/.dsh/profiles/ssid/node_modules`）里，装版仍跑 0.5.3 —— 已核对其 `dist/service.js` 不含本次改动。
+
 
 ## 一句话
 
-面板的「插件技能」只覆盖一种形态 —— 拿 loader entry 的 `name` 去**自己那棵** `node_modules` 里拼 `<name>/skills`。另有一类**扫不到**：用 `bundledSkillDir` 注册的插件技能。方案已评估、未选、未实现。
+面板的「插件技能」需要覆盖两种形态 —— 拿 loader entry 的 `name` 去**自己那棵** `node_modules` 里拼 `<name>/skills`，以及 entry 通过 `bundledSkillDir` 声明的根。下面的推导记录针对的是**第二种当初扫不到**的判据。
 
 ## 报障原文（2026-08-21）
 

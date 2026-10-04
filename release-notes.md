@@ -1,5 +1,30 @@
 # Release Notes — @max-null/dsh-skill-mcp-center
 
+## 0.5.4 (2026-10-04)
+
+### 修复
+
+- **插件用 `bundledSkillDir` 注册的技能扫不到**。面板原先只认一种形态：拿 loader
+  entry 的 `name` 当包名，去拼 `<node_modules>/<包名>/skills`。插件若把官方
+  `@deepseek-ai/dsh-skill-filesystem` 挂在自己的 id 下、用 `bundledSkillDir` 指向
+  自带 `skills/`（活样本 `dsh-plugin-zhihu-search`），说明符就是**另一个包名**，
+  拼出的路径不存在；而它的技能往往还在**另一棵** `node_modules` 树里。
+
+  真正的判据比「拼错了包名」更深一层：`bundledSkillDir` 在 `entry.options.config`
+  里保留的是 `!!js` 表达式节点（`{ __jsExpr }`），**不是路径**——Loader 只把求值后的
+  副本交给 entry 的 fiber，存下来的那份要留着让文件写回保住 `!!js` 写法。所以照
+  options 去拼路径必然落空，且**不报错**（静默漏掉）。
+
+  修法：该配置**从 fiber 读**，两条声明都探，并对同一目录去重。
+
+### 兼容性
+
+- 无接口变更：`listSkills()` 的出入参、端点集合与请求信封均未改，只是发现来源多了
+  一条。插件技能仍是只读展示（`writable: false`），未开放开关。
+- 新增 12 条测试：10 条覆盖根发现（含「options 里的表达式节点不被当路径采信」这一
+  关键回归），2 条用真 cordis + 真 Loader 坐实「options 上是节点、fiber 上是求值后
+  的路径」。后者会在上游改变该行为时变红。
+
 ## 0.5.3 (2026-10-02)
 
 ### 修复

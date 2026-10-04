@@ -139,6 +139,57 @@ export async function scanSkillRoot(root, source, writable = true, provider = 'f
     }
     return skills;
 }
+/**
+ * Skill roots contributed by loaded plugin packages.
+ *
+ * Two declarations reach such a directory, and both are needed:
+ *
+ * - the entry's module specifier, i.e. `<node_modules>/<pkg>/skills` — how
+ *   `@max-null/dsh-skills` and `@max-null/dsh-plugin-center` ship theirs;
+ * - the entry's own `bundledSkillDir` config — the only way to see a plugin
+ *   that mounts the official `@deepseek-ai/dsh-skill-filesystem` under an id
+ *   of its own. `dsh-plugin-zhihu-search` is the live sample: it registers
+ *   `name: '@deepseek-ai/dsh-skill-filesystem'`, and its `skills/` sits in a
+ *   different `node_modules` tree than this plugin's.
+ *
+ * `bundledSkillDir` is read from the **fiber**, never from
+ * `entry.options.config`. A patch may compute the value with a `!!js`
+ * expression, and the Loader keeps that expression as a `{ __jsExpr }` node
+ * in the stored options while handing the owning fiber the evaluated copy —
+ * it interpolates on the `internal/config` waterfall and writes the raw node
+ * back on `internal/update` specifically so file write-back preserves the
+ * `!!js` form. The stored value is therefore an expression node rather than a
+ * path, and reading it can only miss.
+ *
+ * Only **loaded** entries are probed, so this costs a couple of existence
+ * checks per plugin instead of a scan of the whole `node_modules` tree.
+ * @param entries - loaded loader entries.
+ * @param nodeModules - this package's own `node_modules` tree, or null.
+ * @returns the skill roots that exist, deduplicated, in entry order.
+ */
+export function pluginSkillRoots(entries, nodeModules) {
+    const out = [];
+    const seen = new Set();
+    const add = (dir, label) => {
+        if (seen.has(dir) || !existsSync(dir))
+            return;
+        seen.add(dir);
+        out.push({ dir, label });
+    };
+    for (const entry of entries) {
+        const name = entry.options.name;
+        if (nodeModules !== null && name !== '' && !name.startsWith('.') && !name.startsWith('/')) {
+            add(join(nodeModules, ...name.split('/'), 'skills'), `plugin:${name}`);
+        }
+        const config = entry.fiber?.config;
+        const declared = typeof config === 'object' && config !== null && 'bundledSkillDir' in config
+            ? config.bundledSkillDir
+            : undefined;
+        if (typeof declared === 'string')
+            add(declared, `plugin:${entry.options.id}`);
+    }
+    return out;
+}
 export class SkillMcpService extends Service {
     static inject = ['loader', 'tools'];
     officialSkillDirs;
@@ -147,8 +198,7 @@ export class SkillMcpService extends Service {
         this.officialSkillDirs = config.officialSkillDirs ?? [];
     }
     /**
-     * Skill roots that live **inside loaded plugin packages**, i.e.
-     * `<node_modules>/<pkg>/skills`.
+     * Skill roots that live **inside loaded plugin packages**.
      *
      * The host-level skill filesystem is disabled in web-app (presets own
      * discovery), so a plugin that ships skills — `@max-null/dsh-skills` and
@@ -156,24 +206,9 @@ export class SkillMcpService extends Service {
      * package, where no user-level root can see them. Without this the
      * management surface showed 17 user skills while 8 plugin skills were loaded
      * and in effect (2026-09-14 用户报「skill 生效但不展示」).
-     *
-     * Only **loaded** entries are probed, so this costs one existence check per
-     * plugin rather than a scan of the whole node_modules tree.
      */
     pluginSkillDirs() {
-        const nm = ownNodeModules();
-        if (nm === null)
-            return [];
-        const out = [];
-        for (const entry of this.ctx.loader.entries()) {
-            const name = entry.options.name;
-            if (typeof name !== 'string' || name === '' || name.startsWith('.') || name.startsWith('/'))
-                continue;
-            const dir = join(nm, ...name.split('/'), 'skills');
-            if (existsSync(dir))
-                out.push({ dir, label: `plugin:${name}` });
-        }
-        return out;
+        return pluginSkillRoots(this.ctx.loader.entries(), ownNodeModules());
     }
     /**
      * User-level skills, project-level skills for the given workspace, skills
