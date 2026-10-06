@@ -229,6 +229,10 @@ const zhDict: Record<string, string> = {
   hideMd: '收起',
   mdLoadFailed: '读取失败：{e}',
   refOpen: '打开文件引用',
+  deleteSkill: '删除技能',
+  deleteConfirm: '删除技能「{name}」？\n\n{path}\n\n它会被移到回收目录（~/.dsh/.skill-trash），需要时可以手动移回去。',
+  skillDeleted: '已删除 {name}，移到 {path}',
+  deleteFailed: '删除失败：{e}',
 }
 const enDict: Record<string, string> = {
   loading: 'Loading…',
@@ -284,6 +288,10 @@ const enDict: Record<string, string> = {
   hideMd: 'Hide',
   mdLoadFailed: 'Failed to read: {e}',
   refOpen: 'Open file reference',
+  deleteSkill: 'Delete skill',
+  deleteConfirm: 'Delete skill "{name}"?\n\n{path}\n\nIt will be moved to ~/.dsh/.skill-trash and can be moved back manually if needed.',
+  skillDeleted: 'Deleted {name}, moved to {path}',
+  deleteFailed: 'Delete failed: {e}',
 }
 
 // ---- wire types (mirror the host shapes) ----
@@ -460,6 +468,18 @@ function SkillView() {
       e => { setBusy(null); showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
   }
+  const remove = (s: SkillView) => {
+    if (!window.confirm(t('deleteConfirm', { name: s.name, path: s.path }))) return
+    setBusy(s.path)
+    void rpc('deleteSkill', { path: s.path }).then(
+      (v) => {
+        setBusy(null)
+        load()
+        showToast(t('skillDeleted', { name: s.name, path: (v as { trashPath: string }).trashPath }))
+      },
+      e => { setBusy(null); showToast(t('deleteFailed', { e: e instanceof Error ? e.message : String(e) }), 'error') },
+    )
+  }
   const openMd = (s: SkillView) => {
     if (mdPath === s.path) { setMdPath(null); setMdText(null); setMdError(null); return }
     setMdPath(s.path); setMdText(null); setMdError(null)
@@ -516,6 +536,16 @@ function SkillView() {
               <button type="button" className="smc-btn" onClick={() => { openMd(s) }}>
                 {mdPath === s.path ? t('hideMd') : t('viewMd')}
               </button>
+              {s.writable && (
+                <button
+                  type="button"
+                  className="smc-btn danger"
+                  disabled={busy === s.path}
+                  onClick={() => { remove(s) }}
+                >
+                  {t('deleteSkill')}
+                </button>
+              )}
             </div>
             <div className="smc-detail-row">{t('detailPath')}：{s.path}</div>
             {mdPath === s.path && (
@@ -818,6 +848,16 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
     if (!visible) return
     load()
   }, [visible, load])
+  const removeSkill = (s: SkillView) => {
+    if (!window.confirm(t('deleteConfirm', { name: s.name, path: s.path }))) return
+    void rpc('deleteSkill', { path: s.path, cwd }).then(
+      (v) => {
+        load()
+        showToast(t('skillDeleted', { name: s.name, path: (v as { trashPath: string }).trashPath }))
+      },
+      e => { showToast(t('deleteFailed', { e: e instanceof Error ? e.message : String(e) }), 'error') },
+    )
+  }
   const openMd = (path: string) => {
     if (mdPath === path) { setMdPath(null); setMdText(null); setMdError(null); return }
     setMdPath(path); setMdText(null); setMdError(null)
@@ -873,6 +913,17 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                   >
                     {mdPath === s.path ? t('hideMd') : 'MD'}
                   </button>
+                  {s.writable && (
+                    <button
+                      type="button"
+                      className="smc-btn danger"
+                      style={{ height: 20, padding: '0 6px', fontSize: 11 }}
+                      onClick={() => { removeSkill(s) }}
+                      aria-label={t('deleteSkill')}
+                    >
+                      {t('remove')}
+                    </button>
+                  )}
                   <button
                     type="button"
                     className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}

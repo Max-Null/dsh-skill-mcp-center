@@ -140,6 +140,12 @@ async function dispatch(ctx: Context, body: SkillMcpRequest): Promise<RpcResult<
         const cwd = p.cwd
         return { ok: true, value: await ctx.skillMcp.readSkill(path, typeof cwd === 'string' ? cwd : undefined) }
       }
+      case 'deleteSkill': {
+        const path = p.path
+        if (typeof path !== 'string' || path === '') return internal('deleteSkill: path is required')
+        const cwd = p.cwd
+        return { ok: true, value: await ctx.skillMcp.deleteSkill(path, typeof cwd === 'string' ? cwd : undefined) }
+      }
       case 'listMcpServers':
         return { ok: true, value: await ctx.skillMcp.listMcpServers() }
       case 'createMcpServer':

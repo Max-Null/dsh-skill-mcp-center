@@ -126,6 +126,23 @@ export declare function pluginSkillRoots(entries: Iterable<SkillRootEntry>, node
     dir: string;
     label: string;
 }[];
+/**
+ * Resolve the entry one deletion removes, or reject the request.
+ *
+ * `path` is a SKILL.md path as `listSkills` reported it. A bundle
+ * (`<root>/<name>/SKILL.md`) is removed as its directory; a flat file
+ * (`<root>/<name>.md`) as itself.
+ *
+ * The entry must be a **direct child** of one of `roots`. Direct-child
+ * placement, rather than a prefix check, is what keeps this from being aimed
+ * at a root itself, at a nested reference file inside a skill, or at anything
+ * under a plugin package — those roots are not in the list to begin with.
+ * @param path - candidate SKILL.md path.
+ * @param roots - roots a deletion may target.
+ * @returns the absolute entry to remove.
+ * @throws {Error} `skill-not-found` when the path is not a skill entry sitting directly under an allowed root.
+ */
+export declare function deleteTargetOf(path: string, roots: readonly string[]): string;
 export declare class SkillMcpService extends Service {
     static inject: string[];
     private readonly officialSkillDirs;
@@ -154,6 +171,22 @@ export declare class SkillMcpService extends Service {
      * scans, so the RPC cannot be used to read arbitrary files.
      */
     readSkill(path: string, cwd?: string): Promise<string>;
+    /**
+     * Delete one user-level or project-level skill.
+     *
+     * The entry is **moved**, not unlinked: a mistaken deletion lands in
+     * `<home>/.dsh/.skill-trash/` and stays recoverable, and the destination is
+     * returned so the surface can tell the user where it went. Plugin packages
+     * and the official bundled roots are not candidates — see
+     * {@link deletableRoots}.
+     * @param path - absolute SKILL.md path, as `listSkills` reported it.
+     * @param cwd - session workspace, when the caller has one.
+     * @returns the trash path the skill was moved to.
+     * @throws {Error} `skill-not-found` when the path is not deletable; `skill-delete-failed` when the move fails.
+     */
+    deleteSkill(path: string, cwd?: string): Promise<{
+        trashPath: string;
+    }>;
     /** Every `mcp-client` loader entry as a server card. */
     listMcpServers(): Promise<McpServer[]>;
     /** Add one mcp-client entry — hot-connects (create → init) and persists. */

@@ -248,7 +248,11 @@ var zhDict = {
   viewMd: "\u67E5\u770B SKILL.md",
   hideMd: "\u6536\u8D77",
   mdLoadFailed: "\u8BFB\u53D6\u5931\u8D25\uFF1A{e}",
-  refOpen: "\u6253\u5F00\u6587\u4EF6\u5F15\u7528"
+  refOpen: "\u6253\u5F00\u6587\u4EF6\u5F15\u7528",
+  deleteSkill: "\u5220\u9664\u6280\u80FD",
+  deleteConfirm: "\u5220\u9664\u6280\u80FD\u300C{name}\u300D\uFF1F\n\n{path}\n\n\u5B83\u4F1A\u88AB\u79FB\u5230\u56DE\u6536\u76EE\u5F55\uFF08~/.dsh/.skill-trash\uFF09\uFF0C\u9700\u8981\u65F6\u53EF\u4EE5\u624B\u52A8\u79FB\u56DE\u53BB\u3002",
+  skillDeleted: "\u5DF2\u5220\u9664 {name}\uFF0C\u79FB\u5230 {path}",
+  deleteFailed: "\u5220\u9664\u5931\u8D25\uFF1A{e}"
 };
 var enDict = {
   loading: "Loading\u2026",
@@ -303,7 +307,11 @@ var enDict = {
   viewMd: "View SKILL.md",
   hideMd: "Hide",
   mdLoadFailed: "Failed to read: {e}",
-  refOpen: "Open file reference"
+  refOpen: "Open file reference",
+  deleteSkill: "Delete skill",
+  deleteConfirm: 'Delete skill "{name}"?\n\n{path}\n\nIt will be moved to ~/.dsh/.skill-trash and can be moved back manually if needed.',
+  skillDeleted: "Deleted {name}, moved to {path}",
+  deleteFailed: "Delete failed: {e}"
 };
 var rpc = async () => {
   throw new Error("skill-mcp-center: rpc not wired");
@@ -432,6 +440,21 @@ function SkillView() {
       }
     );
   };
+  const remove = (s) => {
+    if (!window.confirm(t("deleteConfirm", { name: s.name, path: s.path }))) return;
+    setBusy(s.path);
+    void rpc("deleteSkill", { path: s.path }).then(
+      (v) => {
+        setBusy(null);
+        load();
+        showToast(t("skillDeleted", { name: s.name, path: v.trashPath }));
+      },
+      (e) => {
+        setBusy(null);
+        showToast(t("deleteFailed", { e: e instanceof Error ? e.message : String(e) }), "error");
+      }
+    );
+  };
   const openMd = (s) => {
     if (mdPath === s.path) {
       setMdPath(null);
@@ -508,7 +531,19 @@ function SkillView() {
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "smc-btn", onClick: () => {
             openMd(s);
-          }, children: mdPath === s.path ? t("hideMd") : t("viewMd") })
+          }, children: mdPath === s.path ? t("hideMd") : t("viewMd") }),
+          s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "smc-btn danger",
+              disabled: busy === s.path,
+              onClick: () => {
+                remove(s);
+              },
+              children: t("deleteSkill")
+            }
+          )
         ] }),
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail-row", children: [
           t("detailPath"),
@@ -829,6 +864,18 @@ function SidebarSkillTab({ visible, cwd }) {
     if (!visible) return;
     load();
   }, [visible, load]);
+  const removeSkill = (s) => {
+    if (!window.confirm(t("deleteConfirm", { name: s.name, path: s.path }))) return;
+    void rpc("deleteSkill", { path: s.path, cwd }).then(
+      (v) => {
+        load();
+        showToast(t("skillDeleted", { name: s.name, path: v.trashPath }));
+      },
+      (e) => {
+        showToast(t("deleteFailed", { e: e instanceof Error ? e.message : String(e) }), "error");
+      }
+    );
+  };
   const openMd = (path) => {
     if (mdPath === path) {
       setMdPath(null);
@@ -898,6 +945,19 @@ ${s.path}`, children: [
             },
             "aria-label": mdPath === s.path ? t("hideMd") : t("viewMd"),
             children: mdPath === s.path ? t("hideMd") : "MD"
+          }
+        ),
+        s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: "smc-btn danger",
+            style: { height: 20, padding: "0 6px", fontSize: 11 },
+            onClick: () => {
+              removeSkill(s);
+            },
+            "aria-label": t("deleteSkill"),
+            children: t("remove")
           }
         ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)(

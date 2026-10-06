@@ -10,9 +10,9 @@ import { Service, type Context, type FiberState } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import type {} from '@deepseek-ai/dsh-tools'
 import { existsSync, type Dirent } from 'node:fs'
-import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { cp, mkdir, readdir, readFile, rename, rm, stat, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
-import { join, sep } from 'node:path'
+import { basename, dirname, join, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseSkillFrontmatter, setDisableModelInvocation } from './frontmatter.ts'
 
@@ -276,6 +276,46 @@ export function pluginSkillRoots(
   return out
 }
 
+/**
+ * Skill roots a deletion may target: the user-level roots plus the given
+ * workspace's, and nothing else.
+ *
+ * Deliberately narrower than the set `readSkill` accepts: plugin packages and
+ * the official bundled roots stay read-only by contract, so they are not
+ * candidates even though the surface lists them.
+ * @param cwd - session workspace, when the caller has one.
+ * @returns the roots a deletion may target.
+ */
+function deletableRoots(cwd?: string): string[] {
+  const roots = SKILL_ROOTS.map(root => root.path)
+  if (cwd !== undefined && cwd !== '') {
+    roots.push(join(cwd, '.agents', 'skills'), join(cwd, '.dsh', 'skills'))
+  }
+  return roots
+}
+
+/**
+ * Resolve the entry one deletion removes, or reject the request.
+ *
+ * `path` is a SKILL.md path as `listSkills` reported it. A bundle
+ * (`<root>/<name>/SKILL.md`) is removed as its directory; a flat file
+ * (`<root>/<name>.md`) as itself.
+ *
+ * The entry must be a **direct child** of one of `roots`. Direct-child
+ * placement, rather than a prefix check, is what keeps this from being aimed
+ * at a root itself, at a nested reference file inside a skill, or at anything
+ * under a plugin package — those roots are not in the list to begin with.
+ * @param path - candidate SKILL.md path.
+ * @param roots - roots a deletion may target.
+ * @returns the absolute entry to remove.
+ * @throws {Error} `skill-not-found` when the path is not a skill entry sitting directly under an allowed root.
+ */
+export function deleteTargetOf(path: string, roots: readonly string[]): string {
+  const entry = basename(path) === 'SKILL.md' ? dirname(path) : path
+  if (!roots.some(root => dirname(entry) === root)) throw new Error('skill-not-found')
+  return entry
+}
+
 export class SkillMcpService extends Service {
   static inject = ['loader', 'tools']
 
@@ -368,6 +408,39 @@ export class SkillMcpService extends Service {
       throw new Error('skill-not-found')
     }
     return text
+  }
+
+  /**
+   * Delete one user-level or project-level skill.
+   *
+   * The entry is **moved**, not unlinked: a mistaken deletion lands in
+   * `<home>/.dsh/.skill-trash/` and stays recoverable, and the destination is
+   * returned so the surface can tell the user where it went. Plugin packages
+   * and the official bundled roots are not candidates — see
+   * {@link deletableRoots}.
+   * @param path - absolute SKILL.md path, as `listSkills` reported it.
+   * @param cwd - session workspace, when the caller has one.
+   * @returns the trash path the skill was moved to.
+   * @throws {Error} `skill-not-found` when the path is not deletable; `skill-delete-failed` when the move fails.
+   */
+  async deleteSkill(path: string, cwd?: string): Promise<{ trashPath: string }> {
+    const entry = deleteTargetOf(path, deletableRoots(cwd))
+    const trashRoot = join(homedir(), '.dsh', '.skill-trash')
+    const trashPath = join(trashRoot, `${Date.now()}-${basename(entry)}`)
+    try {
+      await mkdir(trashRoot, { recursive: true })
+      try {
+        await rename(entry, trashPath)
+      } catch (error) {
+        // Renaming across volumes fails with EXDEV; copy then remove instead.
+        if ((error as { code?: string }).code !== 'EXDEV') throw error
+        await cp(entry, trashPath, { recursive: true })
+        await rm(entry, { recursive: true, force: true })
+      }
+    } catch {
+      throw new Error('skill-delete-failed')
+    }
+    return { trashPath }
   }
 
   /** Every `mcp-client` loader entry as a server card. */
