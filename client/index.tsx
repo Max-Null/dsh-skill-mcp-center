@@ -57,6 +57,10 @@ const CSS = `
 .smc-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
 .smc-toggle.on::after { left: 21px; }
 .smc-toggle:disabled { opacity: 0.4; cursor: default; }
+.smc-skill-group { margin-bottom: 10px; }
+.smc-skill-group-head { display: flex; align-items: baseline; gap: 6px; padding: 6px 2px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--dsw-alias-label-caption); }
+.smc-skill-group-count { font-weight: 400; opacity: .7; }
+.smc-skill-group-note { padding: 0 2px 6px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-caption); }
 
 .smc-input { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; outline: none; font-family: inherit; }
 .smc-input:focus { border-color: var(--dsw-alias-brand-primary); }
@@ -216,6 +220,11 @@ const zhDict: Record<string, string> = {
   groupGlobal: '全局',
   groupWorkspace: '工作区',
   groupBundled: '内置（DSH 官方）',
+  groupProject: '项目级',
+  groupUser: '用户级',
+  groupPlugin: '插件自带',
+  groupRuntime: '代码注册',
+  groupRuntimeNote: '由插件在运行时注册，不可在此禁用',
   readOnlyBadge: '内置只读',
   noMatch: '没有匹配的 skill',
   detailPath: '路径',
@@ -275,6 +284,11 @@ const enDict: Record<string, string> = {
   groupGlobal: 'Global',
   groupWorkspace: 'Workspace',
   groupBundled: 'Built-in (DSH official)',
+  groupProject: 'Project',
+  groupUser: 'User',
+  groupPlugin: 'Plugin-bundled',
+  groupRuntime: 'Code-registered',
+  groupRuntimeNote: 'Registered by a plugin at runtime; cannot be disabled here',
   readOnlyBadge: 'built-in read-only',
   noMatch: 'No matching skills',
   detailPath: 'path',
@@ -818,6 +832,28 @@ function sourceLabel(source: string, short = false): string {
   return short ? name : `plugin · ${name}`
 }
 
+/**
+ * 侧栏按来源分组：同一来源的 skill 聚在一起，读者不必逐个看徽章去猜归属。
+ * 「代码注册」那组是 `ctx.skills.register()` 注册的条目——它们没有 SKILL.md，
+ * 因此没有可写的开关（详见 service.ts 的 runtimeOnlySkills）。
+ */
+type SkillGroupKind = 'project' | 'user' | 'plugin' | 'bundled' | 'runtime'
+const SKILL_GROUP_ORDER: readonly SkillGroupKind[] = ['project', 'user', 'plugin', 'bundled', 'runtime']
+const SKILL_GROUP_LABEL: Record<SkillGroupKind, string> = {
+  project: 'groupProject',
+  user: 'groupUser',
+  plugin: 'groupPlugin',
+  bundled: 'groupBundled',
+  runtime: 'groupRuntime',
+}
+function skillGroupOf(source: string): SkillGroupKind {
+  if (source === 'project-dsh' || source === 'project-agents') return 'project'
+  if (source === 'user-dsh' || source === 'user-agents') return 'user'
+  if (source.startsWith('plugin:')) return 'plugin'
+  if (source === 'bundled') return 'bundled'
+  return 'runtime'
+}
+
 /** Namespace filter mirroring the dsh-memory sidebar: all / global / workspace. */
 type SkillNamespace = 'all' | 'global' | 'workspace'
 function skillInNamespace(s: SkillView, ns: SkillNamespace): boolean {
@@ -895,8 +931,18 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
       <div className="smc-sidebar-list">
         {noWorkspace ? <div className="smc-empty">{t('noWorkspace')}</div>
           : visibleItems.length === 0 ? <div className="smc-empty">{q !== '' ? t('noMatch') : t('noSkills')}</div>
-            : visibleItems.map(s => (
-              <div key={s.path}>
+            : SKILL_GROUP_ORDER
+              .map(kind => ({ kind, items: visibleItems.filter(s => skillGroupOf(s.source) === kind) }))
+              .filter(group => group.items.length > 0)
+              .map(group => (
+                <div key={group.kind} className="smc-skill-group">
+                  <div className="smc-skill-group-head">
+                    <span>{t(SKILL_GROUP_LABEL[group.kind])}</span>
+                    <span className="smc-skill-group-count">{group.items.length}</span>
+                  </div>
+                  {group.kind === 'runtime' && <div className="smc-skill-group-note">{t('groupRuntimeNote')}</div>}
+                  {group.items.map(s => (
+              <div key={s.path === '' ? `runtime:${s.name}` : s.path}>
                 <div className="smc-srv" title={`${s.description}\n${s.path}`}>
                   <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
                   <span className="smc-srv-name">{s.name}</span>
@@ -924,13 +970,17 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                       {t('remove')}
                     </button>
                   )}
-                  <button
-                    type="button"
-                    className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
-                    title={t('toggleModelVisible')}
-                    onClick={() => { void rpc('toggleSkill', { path: s.path }).then(() => { load() }) }}
-                    aria-label={s.modelInvocable ? t('disable') : t('enable')}
-                  />
+                  {/* 代码注册的条目没有 SKILL.md，toggle 无处落笔——不渲染开关，
+                      免得点上去只是把空路径发给 toggleSkill。 */}
+                  {s.writable && (
+                    <button
+                      type="button"
+                      className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
+                      title={t('toggleModelVisible')}
+                      onClick={() => { void rpc('toggleSkill', { path: s.path }).then(() => { load() }) }}
+                      aria-label={s.modelInvocable ? t('disable') : t('enable')}
+                    />
+                  )}
                 </div>
                 {s.description !== '' && <div className="smc-srv-desc">{s.description}</div>}
                 {mdPath === s.path && (
@@ -939,7 +989,9 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                       : <div className="smc-md"><MdWithRefs text={mdText} /></div>
                 )}
               </div>
-            ))}
+                  ))}
+                </div>
+              ))}
       </div>
     </div>
   )

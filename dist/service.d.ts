@@ -163,6 +163,16 @@ export declare class SkillMcpService extends Service {
      * bundled inside loaded plugin packages, and any configured official roots.
      */
     listSkills(cwd?: string): Promise<SkillView[]>;
+    /**
+     * 补上「运行时注册」的 skill：`ctx.skills.register()` 注册的条目没有 SKILL.md，
+     * 磁盘扫描（本项目的主要取数方式）看不到它们——dsh-jubensha 的 DM 手册、office、
+     * genui 都属于这一类。用户因此报了「面板少了很多 skill」。
+     *
+     * skills 服务是**可选**的：web-app 宿主把它关掉（presets 拥有发现，没有全局层可列），
+     * 所以这里 feature-detect，拿不到就原样返回空，不改变既有行为。
+     * 这些条目没有可写的 SKILL.md，标成 `writable: false`——开关对它们没有意义。
+     */
+    private runtimeOnlySkills;
     /** Flip one disk-backed skill's model invocation by rewriting its SKILL.md frontmatter. */
     toggleSkill(path: string): Promise<SkillView>;
     /**

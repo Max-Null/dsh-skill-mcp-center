@@ -81,6 +81,10 @@ var CSS = `
 .smc-toggle::after { content: ''; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: left .15s; }
 .smc-toggle.on::after { left: 21px; }
 .smc-toggle:disabled { opacity: 0.4; cursor: default; }
+.smc-skill-group { margin-bottom: 10px; }
+.smc-skill-group-head { display: flex; align-items: baseline; gap: 6px; padding: 6px 2px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; color: var(--dsw-alias-label-caption); }
+.smc-skill-group-count { font-weight: 400; opacity: .7; }
+.smc-skill-group-note { padding: 0 2px 6px; font-size: 11px; line-height: 1.5; color: var(--dsw-alias-label-caption); }
 
 .smc-input { height: 34px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--dsw-alias-border-l2); background: var(--dsw-alias-bg-layer-3); color: var(--dsw-alias-label-primary); font-size: 13px; line-height: 1.5; outline: none; font-family: inherit; }
 .smc-input:focus { border-color: var(--dsw-alias-brand-primary); }
@@ -236,6 +240,11 @@ var zhDict = {
   groupGlobal: "\u5168\u5C40",
   groupWorkspace: "\u5DE5\u4F5C\u533A",
   groupBundled: "\u5185\u7F6E\uFF08DSH \u5B98\u65B9\uFF09",
+  groupProject: "\u9879\u76EE\u7EA7",
+  groupUser: "\u7528\u6237\u7EA7",
+  groupPlugin: "\u63D2\u4EF6\u81EA\u5E26",
+  groupRuntime: "\u4EE3\u7801\u6CE8\u518C",
+  groupRuntimeNote: "\u7531\u63D2\u4EF6\u5728\u8FD0\u884C\u65F6\u6CE8\u518C\uFF0C\u4E0D\u53EF\u5728\u6B64\u7981\u7528",
   readOnlyBadge: "\u5185\u7F6E\u53EA\u8BFB",
   noMatch: "\u6CA1\u6709\u5339\u914D\u7684 skill",
   detailPath: "\u8DEF\u5F84",
@@ -295,6 +304,11 @@ var enDict = {
   groupGlobal: "Global",
   groupWorkspace: "Workspace",
   groupBundled: "Built-in (DSH official)",
+  groupProject: "Project",
+  groupUser: "User",
+  groupPlugin: "Plugin-bundled",
+  groupRuntime: "Code-registered",
+  groupRuntimeNote: "Registered by a plugin at runtime; cannot be disabled here",
   readOnlyBadge: "built-in read-only",
   noMatch: "No matching skills",
   detailPath: "path",
@@ -835,6 +849,21 @@ function sourceLabel(source, short = false) {
   const name = pkg.split("/").pop() ?? pkg;
   return short ? name : `plugin \xB7 ${name}`;
 }
+var SKILL_GROUP_ORDER = ["project", "user", "plugin", "bundled", "runtime"];
+var SKILL_GROUP_LABEL = {
+  project: "groupProject",
+  user: "groupUser",
+  plugin: "groupPlugin",
+  bundled: "groupBundled",
+  runtime: "groupRuntime"
+};
+function skillGroupOf(source) {
+  if (source === "project-dsh" || source === "project-agents") return "project";
+  if (source === "user-dsh" || source === "user-agents") return "user";
+  if (source.startsWith("plugin:")) return "plugin";
+  if (source === "bundled") return "bundled";
+  return "runtime";
+}
 function skillInNamespace(s, ns) {
   if (ns === "all") return true;
   if (ns === "global") {
@@ -927,57 +956,64 @@ function SidebarSkillTab({ visible, cwd }) {
         k
       )) })
     ] }),
-    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar-list", children: noWorkspace ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noWorkspace") }) : visibleItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: q !== "" ? t("noMatch") : t("noSkills") }) : visibleItems.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
-      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `${s.description}
-${s.path}`, children: [
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
-        !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: t("modelDisabled") }),
-        !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: sourceLabel(s.source, true) }),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "button",
-          {
-            type: "button",
-            className: "smc-btn",
-            style: { height: 20, padding: "0 6px", fontSize: 11 },
-            onClick: () => {
-              openMd(s.path);
-            },
-            "aria-label": mdPath === s.path ? t("hideMd") : t("viewMd"),
-            children: mdPath === s.path ? t("hideMd") : "MD"
-          }
-        ),
-        s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "button",
-          {
-            type: "button",
-            className: "smc-btn danger",
-            style: { height: 20, padding: "0 6px", fontSize: 11 },
-            onClick: () => {
-              removeSkill(s);
-            },
-            "aria-label": t("deleteSkill"),
-            children: t("remove")
-          }
-        ),
-        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
-          "button",
-          {
-            type: "button",
-            className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
-            title: t("toggleModelVisible"),
-            onClick: () => {
-              void rpc("toggleSkill", { path: s.path }).then(() => {
-                load();
-              });
-            },
-            "aria-label": s.modelInvocable ? t("disable") : t("enable")
-          }
-        )
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sidebar-list", children: noWorkspace ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: t("noWorkspace") }) : visibleItems.length === 0 ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-empty", children: q !== "" ? t("noMatch") : t("noSkills") }) : SKILL_GROUP_ORDER.map((kind) => ({ kind, items: visibleItems.filter((s) => skillGroupOf(s.source) === kind) })).filter((group) => group.items.length > 0).map((group) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-skill-group", children: [
+      /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-skill-group-head", children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { children: t(SKILL_GROUP_LABEL[group.kind]) }),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-skill-group-count", children: group.items.length })
       ] }),
-      s.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-desc", children: s.description }),
-      mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
-    ] }, s.path)) })
+      group.kind === "runtime" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-skill-group-note", children: t("groupRuntimeNote") }),
+      group.items.map((s) => /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
+        /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-srv", title: `${s.description}
+${s.path}`, children: [
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-dot${s.modelInvocable ? "" : " idle"}` }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
+          !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: t("modelDisabled") }),
+          !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: sourceLabel(s.source, true) }),
+          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "smc-btn",
+              style: { height: 20, padding: "0 6px", fontSize: 11 },
+              onClick: () => {
+                openMd(s.path);
+              },
+              "aria-label": mdPath === s.path ? t("hideMd") : t("viewMd"),
+              children: mdPath === s.path ? t("hideMd") : "MD"
+            }
+          ),
+          s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: "smc-btn danger",
+              style: { height: 20, padding: "0 6px", fontSize: 11 },
+              onClick: () => {
+                removeSkill(s);
+              },
+              "aria-label": t("deleteSkill"),
+              children: t("remove")
+            }
+          ),
+          s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+            "button",
+            {
+              type: "button",
+              className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
+              title: t("toggleModelVisible"),
+              onClick: () => {
+                void rpc("toggleSkill", { path: s.path }).then(() => {
+                  load();
+                });
+              },
+              "aria-label": s.modelInvocable ? t("disable") : t("enable")
+            }
+          )
+        ] }),
+        s.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-desc", children: s.description }),
+        mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
+      ] }, s.path === "" ? `runtime:${s.name}` : s.path))
+    ] }, group.kind)) })
   ] });
 }
 var inject = ["slots", "connection", "locale"];
