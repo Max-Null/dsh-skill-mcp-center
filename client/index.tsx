@@ -6,6 +6,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import type {} from 'dsh-better-sidebar'
 import type {} from '@deepseek-ai/dsh-client-locale'
+import { hasSkillFile, skillKeyOf } from './skill-key.ts'
 
 // ---- injected stylesheet (single sheet, :hover/:focus live here) ----
 const CSS = `
@@ -235,6 +236,7 @@ const zhDict: Record<string, string> = {
   nsWorkspace: '工作区',
   noWorkspace: '未选择工作区',
   viewMd: '查看 SKILL.md',
+  noSkillFile: '无 SKILL.md',
   hideMd: '收起',
   mdLoadFailed: '读取失败：{e}',
   refOpen: '打开文件引用',
@@ -299,6 +301,7 @@ const enDict: Record<string, string> = {
   nsWorkspace: 'Workspace',
   noWorkspace: 'No workspace selected',
   viewMd: 'View SKILL.md',
+  noSkillFile: 'no SKILL.md',
   hideMd: 'Hide',
   mdLoadFailed: 'Failed to read: {e}',
   refOpen: 'Open file reference',
@@ -495,8 +498,9 @@ function SkillView() {
     )
   }
   const openMd = (s: SkillView) => {
-    if (mdPath === s.path) { setMdPath(null); setMdText(null); setMdError(null); return }
-    setMdPath(s.path); setMdText(null); setMdError(null)
+    if (!hasSkillFile(s)) return
+    if (mdPath === skillKeyOf(s)) { setMdPath(null); setMdText(null); setMdError(null); return }
+    setMdPath(skillKeyOf(s)); setMdText(null); setMdError(null)
     void rpc('readSkill', { path: s.path }).then(
       v => { setMdText(v as string) },
       e => { setMdError(e instanceof Error ? e.message : String(e)) },
@@ -513,16 +517,16 @@ function SkillView() {
     else other.push(s)
   }
   const renderCard = (s: SkillView) => {
-    const open = expanded === s.path
+    const open = expanded === skillKeyOf(s)
     return (
-      <div key={s.path} className="smc-card">
+      <div key={skillKeyOf(s)} className="smc-card">
         <div className="smc-card-head">
           <button
             type="button"
             className="smc-card-title"
             aria-expanded={open}
             title={t('clickForDetail')}
-            onClick={() => { setExpanded(open ? null : s.path) }}
+            onClick={() => { setExpanded(open ? null : skillKeyOf(s)) }}
           >
             <span className="smc-card-name">{s.name}</span>
             <span className="smc-card-desc">{s.description}</span>
@@ -547,9 +551,11 @@ function SkillView() {
               {!s.modelInvocable && <span className="smc-badge disabled">{t('modelDisabled')}</span>}
               {!s.writable && <span className="smc-badge disabled">{t('readOnlyBadge')}</span>}
               <span className="smc-spacer" />
-              <button type="button" className="smc-btn" onClick={() => { openMd(s) }}>
-                {mdPath === s.path ? t('hideMd') : t('viewMd')}
-              </button>
+              {!hasSkillFile(s) ? <span className="smc-badge disabled">{t('noSkillFile')}</span> : (
+                <button type="button" className="smc-btn" onClick={() => { openMd(s) }}>
+                  {mdPath === skillKeyOf(s) ? t('hideMd') : t('viewMd')}
+                </button>
+              )}
               {s.writable && (
                 <button
                   type="button"
@@ -561,8 +567,8 @@ function SkillView() {
                 </button>
               )}
             </div>
-            <div className="smc-detail-row">{t('detailPath')}：{s.path}</div>
-            {mdPath === s.path && (
+            <div className="smc-detail-row">{t('detailPath')}：{hasSkillFile(s) ? s.path : t('noSkillFile')}</div>
+            {mdPath === skillKeyOf(s) && (
               mdError !== null ? <div className="smc-md-err">{t('mdLoadFailed', { e: mdError })}</div>
                 : mdText === null ? <div className="smc-md">{t('loading')}</div>
                   : <div className="smc-md"><MdWithRefs text={mdText} /></div>
@@ -895,6 +901,7 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
     )
   }
   const openMd = (path: string) => {
+    if (path === '') return
     if (mdPath === path) { setMdPath(null); setMdText(null); setMdError(null); return }
     setMdPath(path); setMdText(null); setMdError(null)
     void rpc('readSkill', { path, cwd }).then(
@@ -942,7 +949,7 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                   </div>
                   {group.kind === 'runtime' && <div className="smc-skill-group-note">{t('groupRuntimeNote')}</div>}
                   {group.items.map(s => (
-              <div key={s.path === '' ? `runtime:${s.name}` : s.path}>
+              <div key={skillKeyOf(s)}>
                 <div className="smc-srv" title={`${s.description}\n${s.path}`}>
                   <span className={`smc-dot${s.modelInvocable ? '' : ' idle'}`} />
                   <span className="smc-srv-name">{s.name}</span>
@@ -950,15 +957,19 @@ function SidebarSkillTab({ visible, cwd }: { visible: boolean; cwd?: string }) {
                   {/* 来源标签取代原先的「内置只读」：不可写时，读者更想知道它属于哪个
                       插件（读不出信息量的「只读」已由禁用的开关表达）。2026-09-14 用户要求。 */}
                   {!s.writable && <span className="smc-badge">{sourceLabel(s.source, true)}</span>}
-                  <button
-                    type="button"
-                    className="smc-btn"
-                    style={{ height: 20, padding: '0 6px', fontSize: 11 }}
-                    onClick={() => { openMd(s.path) }}
-                    aria-label={mdPath === s.path ? t('hideMd') : t('viewMd')}
-                  >
-                    {mdPath === s.path ? t('hideMd') : 'MD'}
-                  </button>
+                  {/* 代码注册的条目没有 SKILL.md：不渲染阅读按钮，免得点上去只是把空
+                      路径发给 readSkill 换回一句「path is required」。 */}
+                  {hasSkillFile(s) && (
+                    <button
+                      type="button"
+                      className="smc-btn"
+                      style={{ height: 20, padding: '0 6px', fontSize: 11 }}
+                      onClick={() => { openMd(s.path) }}
+                      aria-label={mdPath === s.path ? t('hideMd') : t('viewMd')}
+                    >
+                      {mdPath === s.path ? t('hideMd') : 'MD'}
+                    </button>
+                  )}
                   {s.writable && (
                     <button
                       type="button"

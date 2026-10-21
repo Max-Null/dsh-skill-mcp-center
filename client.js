@@ -31,6 +31,17 @@ __export(index_exports, {
 });
 module.exports = __toCommonJS(index_exports);
 var import_react = require("react");
+
+// client/skill-key.ts
+var RUNTIME_KEY_PREFIX = "\0runtime:";
+function skillKeyOf(skill) {
+  return skill.path === "" ? `${RUNTIME_KEY_PREFIX}${skill.name}` : skill.path;
+}
+function hasSkillFile(skill) {
+  return skill.path !== "";
+}
+
+// client/index.tsx
 var import_jsx_runtime = require("react/jsx-runtime");
 var CSS = `
 .smc-title { font-size: 18px; font-weight: 600; line-height: 26px; color: var(--dsw-alias-label-primary); }
@@ -255,6 +266,7 @@ var zhDict = {
   nsWorkspace: "\u5DE5\u4F5C\u533A",
   noWorkspace: "\u672A\u9009\u62E9\u5DE5\u4F5C\u533A",
   viewMd: "\u67E5\u770B SKILL.md",
+  noSkillFile: "\u65E0 SKILL.md",
   hideMd: "\u6536\u8D77",
   mdLoadFailed: "\u8BFB\u53D6\u5931\u8D25\uFF1A{e}",
   refOpen: "\u6253\u5F00\u6587\u4EF6\u5F15\u7528",
@@ -319,6 +331,7 @@ var enDict = {
   nsWorkspace: "Workspace",
   noWorkspace: "No workspace selected",
   viewMd: "View SKILL.md",
+  noSkillFile: "no SKILL.md",
   hideMd: "Hide",
   mdLoadFailed: "Failed to read: {e}",
   refOpen: "Open file reference",
@@ -470,13 +483,14 @@ function SkillView() {
     );
   };
   const openMd = (s) => {
-    if (mdPath === s.path) {
+    if (!hasSkillFile(s)) return;
+    if (mdPath === skillKeyOf(s)) {
       setMdPath(null);
       setMdText(null);
       setMdError(null);
       return;
     }
-    setMdPath(s.path);
+    setMdPath(skillKeyOf(s));
     setMdText(null);
     setMdError(null);
     void rpc("readSkill", { path: s.path }).then(
@@ -498,7 +512,7 @@ function SkillView() {
     else other.push(s);
   }
   const renderCard = (s) => {
-    const open = expanded === s.path;
+    const open = expanded === skillKeyOf(s);
     return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card", children: [
       /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-card-head", children: [
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)(
@@ -509,7 +523,7 @@ function SkillView() {
             "aria-expanded": open,
             title: t("clickForDetail"),
             onClick: () => {
-              setExpanded(open ? null : s.path);
+              setExpanded(open ? null : skillKeyOf(s));
             },
             children: [
               /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-card-name", children: s.name }),
@@ -543,9 +557,9 @@ function SkillView() {
           !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("modelDisabled") }),
           !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("readOnlyBadge") }),
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "smc-btn", onClick: () => {
+          !hasSkillFile(s) ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge disabled", children: t("noSkillFile") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("button", { type: "button", className: "smc-btn", onClick: () => {
             openMd(s);
-          }, children: mdPath === s.path ? t("hideMd") : t("viewMd") }),
+          }, children: mdPath === skillKeyOf(s) ? t("hideMd") : t("viewMd") }),
           s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
             "button",
             {
@@ -562,11 +576,11 @@ function SkillView() {
         /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail-row", children: [
           t("detailPath"),
           "\uFF1A",
-          s.path
+          hasSkillFile(s) ? s.path : t("noSkillFile")
         ] }),
-        mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
+        mdPath === skillKeyOf(s) && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
       ] })
-    ] }, s.path);
+    ] }, skillKeyOf(s));
   };
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-toolbar", children: [
@@ -906,6 +920,7 @@ function SidebarSkillTab({ visible, cwd }) {
     );
   };
   const openMd = (path) => {
+    if (path === "") return;
     if (mdPath === path) {
       setMdPath(null);
       setMdText(null);
@@ -969,7 +984,7 @@ ${s.path}`, children: [
           /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-srv-name", children: s.name }),
           !s.modelInvocable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: t("modelDisabled") }),
           !s.writable && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-badge", children: sourceLabel(s.source, true) }),
-          /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          hasSkillFile(s) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
             "button",
             {
               type: "button",
@@ -1012,7 +1027,7 @@ ${s.path}`, children: [
         ] }),
         s.description !== "" && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-srv-desc", children: s.description }),
         mdPath === s.path && (mdError !== null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md-err", children: t("mdLoadFailed", { e: mdError }) }) : mdText === null ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: t("loading") }) : /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-md", children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)(MdWithRefs, { text: mdText }) }))
-      ] }, s.path === "" ? `runtime:${s.name}` : s.path))
+      ] }, skillKeyOf(s)))
     ] }, group.kind)) })
   ] });
 }
