@@ -22,7 +22,7 @@ ctx.loader.create({ id, name:'mcp-client', config })
        │         └─ 新 entry 无 fiber → `!previous?.uid` 成立
        │              └─ await this.init()  (index.js:416)
        │                   └─ _init() → import + start（热连接 MCP）
-       └─ group.tree.write()              // 持久化回 cordis.yml
+       └─ group.tree.write()              // 调用了，但根树 write 是 no-op（见 §1.5）
 ```
 
 ### 1.3 结论（比 D4 更精确）
@@ -32,6 +32,19 @@ ctx.loader.create({ id, name:'mcp-client', config })
 - **删除 server 热下线** ✅：`remove(id)` → `entry._dispose()` → 断开连接 + 卸载工具。
 
 三者都通过 `tree.write()` 持久化回 cordis.yml，所以「热生效 + 跨重启保留」都成立。
+
+### 1.5 修正（2026-10-25）：`tree.write()` 不落盘
+
+上面那句「跨重启保留也成立」是**错的**——当时只验证了热生效，没做重启验证，把 `tree.write()` 的调用当成了落盘。
+
+实测依据：
+
+- `@deepseek-ai/cordis-plugin-loader@1.0.2` 的 `lib/index.js:715` 是 `write() {}`；
+- DSH 源码 `vendor/loader/src/index.ts:171-173` 的注释写明：`// Loader's root tree is in-memory; writes are no-ops.`
+
+所以 `create` / `update` / `remove` 的**热生效成立**（改的是内存树与 fiber 生命周期），**跨重启保留不成立**：重启后从 `cordis.yml` / `cordis.patch.yml` 重新加载，运行期的改动全部丢失。`Max-Null/dsh-skill-mcp-center#6` 在 DSH 2.0.19-next 上实测确认了这一点（禁用后磁盘无 `disabled` 写入，手写 patch 才生效）。
+
+热生效肉眼可见、持久化要重启才暴露差异——这就是这条错误能存活至今的原因。
 
 ### 1.4 边界（写入实现注意）
 
