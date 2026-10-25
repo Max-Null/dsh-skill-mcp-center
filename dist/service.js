@@ -232,6 +232,8 @@ export function deleteTargetOf(path, roots) {
 export class SkillMcpService extends Service {
     static inject = ['loader', 'tools'];
     officialSkillDirs;
+    /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
+    sessionToggled = new Set();
     constructor(ctx, config = {}) {
         super(ctx, 'skillMcp');
         this.officialSkillDirs = config.officialSkillDirs ?? [];
@@ -415,6 +417,7 @@ export class SkillMcpService extends Service {
                 url: cfg?.url,
                 headers: cfg?.headers,
                 disabled: entry.disabled,
+                sessionToggled: this.sessionToggled.has(entry.id),
                 fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
             });
         }
@@ -436,9 +439,12 @@ export class SkillMcpService extends Service {
     async removeMcpServer(id) {
         await this.ctx.loader.remove(id);
     }
-    /** Enable/disable one server without deleting its config. */
+    /** Enable/disable one server without deleting its config. The host does not persist this. */
     async setMcpServerEnabled(id, enabled) {
         await this.ctx.loader.update(id, { disabled: enabled ? null : true });
+        // 记「本次运行改过」：Loader 根树的 write 是 no-op（loader lib/index.js 的 `write() {}`），
+        // 所以这里改的只是内存态；面板据此显示“重启后恢复”，而不是假装它是持久设置。
+        this.sessionToggled.add(id);
     }
     /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
     async mcpStatus() {

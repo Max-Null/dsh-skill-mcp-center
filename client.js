@@ -223,6 +223,8 @@ var zhDict = {
   provider: "provider \xB7 {name}",
   addServer: "\uFF0B \u6DFB\u52A0 server",
   hotApplied: "\u589E\u5220\u6539\u70ED\u751F\u6548\uFF0C\u514D\u91CD\u542F",
+  switchSessionOnly: "\u5F00\u5173\u53EA\u5BF9\u672C\u6B21\u8FD0\u884C\u751F\u6548\uFF0C\u91CD\u542F\u540E\u6062\u590D\uFF08\u8981\u957F\u671F\u7981\u7528\uFF0C\u7ED9\u8BE5\u6761\u76EE\u52A0 disabled: true\uFF09",
+  switchReverted: "\u672C\u6B21\u8FD0\u884C\u5DF2\u505C\u7528 \xB7 \u91CD\u542F\u6062\u590D",
   edit: "\u7F16\u8F91",
   remove: "\u5220\u9664",
   disableServer: "\u505C\u7528\uFF08\u65AD\u5F00\u5E76\u91CA\u653E context\uFF09",
@@ -288,6 +290,8 @@ var enDict = {
   provider: "provider \xB7 {name}",
   addServer: "\uFF0B Add server",
   hotApplied: "hot-applied, no restart",
+  switchSessionOnly: "switch applies to this run only, reverted after restart (to disable for good, add disabled: true to the entry)",
+  switchReverted: "disabled for this run \xB7 restored on restart",
   edit: "Edit",
   remove: "Remove",
   disableServer: "Disable (disconnect & free context)",
@@ -659,6 +663,7 @@ function McpView() {
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-spacer" }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: "smc-sub", children: t("hotApplied") })
     ] }),
+    /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-sub", style: { marginBottom: 8 }, children: t("switchSessionOnly") }),
     editing !== null && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(ServerForm, { server: editing === "new" ? null : editing, onClose: () => {
       setEditing(null);
     }, onSaved: () => {
@@ -690,7 +695,8 @@ function McpView() {
           }
         )
       ] }),
-      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: s.transport === "stdio" ? `${s.command ?? ""} ${(s.args ?? []).join(" ")}` : s.url })
+      /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: s.transport === "stdio" ? `${s.command ?? ""} ${(s.args ?? []).join(" ")}` : s.url }),
+      s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
     ] }, s.id))
   ] });
 }

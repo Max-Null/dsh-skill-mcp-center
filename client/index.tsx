@@ -193,6 +193,8 @@ const zhDict: Record<string, string> = {
   provider: 'provider · {name}',
   addServer: '＋ 添加 server',
   hotApplied: '增删改热生效，免重启',
+  switchSessionOnly: '开关只对本次运行生效，重启后恢复（要长期禁用，给该条目加 disabled: true）',
+  switchReverted: '本次运行已停用 · 重启恢复',
   edit: '编辑',
   remove: '删除',
   disableServer: '停用（断开并释放 context）',
@@ -258,6 +260,8 @@ const enDict: Record<string, string> = {
   provider: 'provider · {name}',
   addServer: '＋ Add server',
   hotApplied: 'hot-applied, no restart',
+  switchSessionOnly: 'switch applies to this run only, reverted after restart (to disable for good, add disabled: true to the entry)',
+  switchReverted: 'disabled for this run · restored on restart',
   edit: 'Edit',
   remove: 'Remove',
   disableServer: 'Disable (disconnect & free context)',
@@ -332,6 +336,8 @@ interface McpServer {
   url?: string
   headers?: Record<string, string>
   disabled: boolean
+  /** 本次运行被面板改过开关——host 侧内存态，重启即清空。 */
+  sessionToggled?: boolean
   fiberPhase: string | null
 }
 /** One tool a server contributes, as the surface lists it. */
@@ -639,6 +645,7 @@ function McpView() {
         <span className="smc-spacer" />
         <span className="smc-sub">{t('hotApplied')}</span>
       </div>
+      <div className="smc-sub" style={{ marginBottom: 8 }}>{t('switchSessionOnly')}</div>
       {editing !== null && <ServerForm server={editing === 'new' ? null : editing} onClose={() => { setEditing(null) }} onSaved={() => { setEditing(null); load() }} />}
       {items.map(s => (
         <div key={s.id} className="smc-card smc-card-pad">
@@ -658,6 +665,9 @@ function McpView() {
             />
           </div>
           <div className="smc-desc">{s.transport === 'stdio' ? `${s.command ?? ''} ${(s.args ?? []).join(' ')}` : s.url}</div>
+          {s.disabled && s.sessionToggled === true && (
+            <div className="smc-desc">{t('switchReverted')}</div>
+          )}
         </div>
       ))}
     </div>

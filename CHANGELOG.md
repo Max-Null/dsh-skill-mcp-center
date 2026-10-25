@@ -2,6 +2,13 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.3] - 2026-10-25
+
+### Changed
+
+- **MCP 开关的效力边界写进界面**：DSH 的 `Loader.write()` 是空实现（`cordis-plugin-loader@1.0.2` 的 `lib/index.js:715` 就是 `write() {}`，源码注释写明「root tree is in-memory; writes are no-ops」），所以面板的启停只对本次运行生效，重启后从 `cordis.patch.yml` 重新加载、恢复启用（`#6`）。MCP 视图顶部现在写明这一点，被面板关掉且属于本次运行的条目显示「本次运行已停用 · 重启恢复」。
+- `listMcpServers` 新增 `sessionToggled`：只有本运行内被面板改过开关的条目才为真。`cordis.patch.yml` 里 `disabled: true` 的条目是持久禁用，不能被标成「重启恢复」——两种「关」要能区分开。
+
 ## [0.6.2] - 2026-10-24
 
 ### Fixed

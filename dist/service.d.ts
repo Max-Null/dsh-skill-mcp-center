@@ -42,6 +42,13 @@ export interface McpServer {
     url?: string;
     headers?: Record<string, string>;
     disabled: boolean;
+    /**
+     * True when the switch was changed during this run. Lets the panel say
+     * "reverted on restart" only where that is true — an entry disabled in
+     * `cordis.patch.yml` stays disabled across restarts and must not be
+     * labelled as session-only.
+     */
+    sessionToggled: boolean;
     fiberPhase: string | null;
 }
 /** One tool a server contributes, as the management surface lists it. */
@@ -146,6 +153,8 @@ export declare function deleteTargetOf(path: string, roots: readonly string[]): 
 export declare class SkillMcpService extends Service {
     static inject: string[];
     private readonly officialSkillDirs;
+    /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
+    private readonly sessionToggled;
     constructor(ctx: Context, config?: SkillConfig);
     /**
      * Skill roots that live **inside loaded plugin packages**.
@@ -207,7 +216,7 @@ export declare class SkillMcpService extends Service {
     updateMcpServer(id: string, config: McpConfig): Promise<void>;
     /** Remove one server — disconnects and unregisters its tools. */
     removeMcpServer(id: string): Promise<void>;
-    /** Enable/disable one server without deleting its config. */
+    /** Enable/disable one server without deleting its config. The host does not persist this. */
     setMcpServerEnabled(id: string, enabled: boolean): Promise<void>;
     /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
     mcpStatus(): Promise<McpServerStatus[]>;
