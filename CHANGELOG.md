@@ -2,6 +2,12 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.5] - 2026-10-25
+
+### Fixed
+
+- **README 的 MCP 截图重拍**：0.6.4 带的是整窗截图，把侧栏的会话标题一起框了进去；换成只含设置对话框的裁剪图（`[role="dialog"]` 的 boundingBox），内容不变。
+
 ## [0.6.4] - 2026-10-25
 
 ### Fixed
