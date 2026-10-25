@@ -23,6 +23,12 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 
 ![设置 → Skill & MCP](docs/shots/skill-mcp-1.png)
 
+### 设置页：MCP 开关的效力边界
+
+DSH 的 `Loader.write()` 是空实现，面板上的启停只改内存树——所以 MCP 标签页顶部写明「开关只对本次运行生效，重启后恢复」；要长期禁用，给 `cordis.patch.yml` 的对应条目加 `disabled: true`。被面板关掉的条目会在卡片里标「本次运行已停用 · 重启恢复」，而 patch 里持久禁用的条目不标——两种「关」必须能区分：
+
+![MCP 开关的效力边界](docs/shots/mcp-switch-session-only.png)
+
 ### 侧栏：Skill 一览
 
 搜索 + 命名空间筛选（全部 / 全局 / 工作区），每条带开关与 `MD`（查看 SKILL.md）。**插件包内自带的 skill 同样列出**，并标出来源插件——下图里 8 个 `ssid-*` 来自 `dsh-skills`，而用户级的 `ssid-release` 没有来源标签，这正是两者的区别：

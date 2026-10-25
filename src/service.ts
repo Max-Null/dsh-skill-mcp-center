@@ -499,15 +499,21 @@ export class SkillMcpService extends Service {
       // The official bridge's specifier is the package name, not its internal
       // plugin `name` ('mcp-client'); one entry = one MCP server.
       if (entry.options.name !== '@deepseek-ai/dsh-mcp-client') continue
-      const cfg = entry.options.config as Partial<McpConfig> | undefined
+      // `!!js` 表达式在 options.config 里保留为 { __jsExpr } 节点，求值结果在 fiber.config 上
+      // （与本仓库 pluginSkillRoots 同一个坑）。照 options 读会把表达式当值：
+      // command 渲染成 [object Object]、args 变成一串 JSON 转义。fiber 缺失时退回 options。
+      const evaluated = entry.fiber?.config as Partial<McpConfig> | undefined
+      const cfg = evaluated ?? (entry.options.config as Partial<McpConfig> | undefined)
+      const text = (value: unknown): string | undefined =>
+        typeof value === 'string' ? value : value === undefined ? undefined : JSON.stringify(value)
       servers.push({
         id: entry.id,
         serverName: cfg?.serverName ?? entry.id,
         transport: cfg?.transport === 'streamable-http' ? 'streamable-http' : 'stdio',
-        command: cfg?.command,
-        args: cfg?.args,
-        cwd: cfg?.cwd,
-        url: cfg?.url,
+        command: text(cfg?.command),
+        args: cfg?.args?.map(arg => text(arg) ?? ''),
+        cwd: text(cfg?.cwd),
+        url: text(cfg?.url),
         headers: cfg?.headers,
         disabled: entry.disabled,
         sessionToggled: this.sessionToggled.has(entry.id),

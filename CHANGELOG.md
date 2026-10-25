@@ -2,6 +2,16 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.6.4] - 2026-10-25
+
+### Fixed
+
+- **MCP 卡片的命令行不再渲染成 `[object Object]`**：`cordis.yml` 里的 `command` / `args` 可以是 `!!js` 表达式，`options.config` 上保留为 `{ __jsExpr }` 节点、求值结果在 `fiber.config` 上（与 `pluginSkillRoots` 同一个坑）。`listMcpServers` 原来照 options 读，`playwright-headless` 这类条目就显示成 `[object Object] {"__jsExpr":"…"}`。现在优先读 `fiber.config`，非字符串值再归一成字符串。
+
+### Changed
+
+- README 截图段补 MCP 标签页，含开关的效力边界说明与「本次运行已停用」的行内提示。
+
 ## [0.6.3] - 2026-10-25
 
 ### Changed

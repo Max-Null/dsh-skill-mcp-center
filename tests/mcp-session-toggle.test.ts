@@ -61,4 +61,24 @@ describe('MCP 开关的会话内记账', () => {
     const server = (await service.listMcpServers()).find(s => s.id === 'mcp-rea')
     expect(server?.sessionToggled).toBe(true)
   })
+
+  it('对象型 args 归一成字符串——面板不再渲染 [object Object]', async () => {
+    const entry = {
+      id: 'mcp-playwright',
+      options: {
+        name: '@deepseek-ai/dsh-mcp-client',
+        config: {
+          serverName: 'playwright',
+          transport: 'stdio',
+          command: 'npx',
+          args: ['--headless', { browser: 'chromium' }],
+        },
+      },
+      disabled: false,
+      fiber: undefined,
+    }
+    const { service } = makeService([entry])
+    const server = (await service.listMcpServers())[0]
+    expect(server?.args).toEqual(['--headless', '{"browser":"chromium"}'])
+  })
 })
