@@ -134,6 +134,12 @@ async function dispatch(ctx: Context, body: SkillMcpRequest): Promise<RpcResult<
         if (typeof path !== 'string' || path === '') return internal('toggleSkill: path is required')
         return { ok: true, value: await ctx.skillMcp.toggleSkill(path) }
       }
+      case 'setSkillEnabled': {
+        const name = p.name
+        if (typeof name !== 'string' || name === '') return internal('setSkillEnabled: name is required')
+        await ctx.skillMcp.setSkillEnabled(name, p.enabled === true)
+        return { ok: true, value: null }
+      }
       case 'readSkill': {
         const path = p.path
         if (typeof path !== 'string' || path === '') return internal('readSkill: path is required')

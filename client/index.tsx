@@ -187,6 +187,7 @@ const zhDict: Record<string, string> = {
   sectionSub: '管理（静态配置）· 运行时状态在右侧边栏',
   modelDisabled: '模型已停用',
   toggleModelVisible: '切换模型可见',
+  toggleSkillEnabled: '启用 / 停用（运行时遮蔽，即时生效）',
   skillReadonly: 'system/runtime 技能只读',
   enable: '启用',
   disable: '停用',
@@ -254,6 +255,7 @@ const enDict: Record<string, string> = {
   sectionSub: 'Manage (static config) · runtime status lives in the sidebar',
   modelDisabled: 'Model disabled',
   toggleModelVisible: 'Toggle model visibility',
+  toggleSkillEnabled: 'Enable / disable (runtime shadow, applies immediately)',
   skillReadonly: 'system/runtime skills are read-only',
   enable: 'Enable',
   disable: 'Disable',
@@ -325,6 +327,8 @@ interface SkillView {
   userInvocable: boolean
   writable: boolean
   path: string
+  /** False when the panel disabled this skill (a runtime placeholder shadows it). */
+  enabled: boolean
 }
 interface McpServer {
   id: string
@@ -485,8 +489,12 @@ function SkillView() {
   if (error !== null) return <p className="smc-sub">{t('loadFailed', { e: error })}</p>
   if (items === null) return <p className="smc-sub">{t('loading')}</p>
   const toggle = (s: SkillView) => {
-    setBusy(s.path)
-    void rpc('toggleSkill', { path: s.path }).then(
+    setBusy(skillKeyOf(s))
+    // 磁盘技能改 frontmatter；包内技能没有可写文件，走运行时占位遮蔽（rank 250 赢过 provider）。
+    const call = s.writable
+      ? rpc('toggleSkill', { path: s.path })
+      : rpc('setSkillEnabled', { name: s.name, enabled: !s.enabled })
+    void call.then(
       () => { setBusy(null); load(); showToast(t('skillToggled', { name: s.name })) },
       e => { setBusy(null); showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
@@ -537,16 +545,16 @@ function SkillView() {
             <span className="smc-card-name">{s.name}</span>
             <span className="smc-card-desc">{s.description}</span>
           </button>
-          {s.writable ? (
+          {(s.writable || hasSkillFile(s)) && (
             <button
               type="button"
-              className={`smc-toggle${s.modelInvocable ? ' on' : ''}`}
-              disabled={busy === s.path}
-              title={t('toggleModelVisible')}
+              className={`smc-toggle${(s.writable ? s.modelInvocable : s.enabled) ? ' on' : ''}`}
+              disabled={busy === skillKeyOf(s)}
+              title={s.writable ? t('toggleModelVisible') : t('toggleSkillEnabled')}
               onClick={() => { toggle(s) }}
-              aria-label={s.modelInvocable ? t('disable') : t('enable')}
+              aria-label={(s.writable ? s.modelInvocable : s.enabled) ? t('disable') : t('enable')}
             />
-          ) : null}
+          )}
           <span className={`smc-chevron${open ? ' open' : ''}`} />
         </div>
         {open && (

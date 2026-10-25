@@ -46,6 +46,8 @@ export interface SkillView {
   writable: boolean
   /** Absolute SKILL.md path (the toggle target; opaque to the client display). */
   path: string
+  /** False when the panel disabled this skill; a runtime placeholder shadows the real definition. */
+  enabled: boolean
 }
 
 /** Plugin configuration for the skill/MCP engine. */
@@ -219,6 +221,7 @@ export async function scanSkillRoot(root: string, source: string, writable = tru
       userInvocable: true,
       writable,
       path: skillPath,
+      enabled: true,
     })
   }
   return skills
@@ -332,6 +335,15 @@ export class SkillMcpService extends Service {
   /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
   private readonly sessionToggled = new Set<string>()
 
+  /** Skill names the panel disabled; runtime placeholders shadow the real definitions. */
+  private readonly skillsDisabled = new Set<string>()
+
+  /** Live disposers for those shadow registrations, keyed by skill name. */
+  private readonly shadowDisposers = new Map<string, () => void>()
+
+  /** Set once the disabled list has been read from disk and replayed. */
+  private shadowsLoaded = false
+
   constructor(ctx: Context, config: SkillConfig = {}) {
     super(ctx, 'skillMcp')
     this.officialSkillDirs = config.officialSkillDirs ?? []
@@ -356,6 +368,7 @@ export class SkillMcpService extends Service {
    * bundled inside loaded plugin packages, and any configured official roots.
    */
   async listSkills(cwd?: string): Promise<SkillView[]> {
+    await this.loadDisabledSkills()
     const skills: SkillView[] = []
     for (const root of SKILL_ROOTS) {
       skills.push(...await scanSkillRoot(root.path, root.source))
@@ -371,7 +384,11 @@ export class SkillMcpService extends Service {
       skills.push(...await scanSkillRoot(dir, 'bundled', false, 'dsh-official'))
     }
     skills.push(...await this.runtimeOnlySkills(skills))
-    return skills
+    return skills.map(skill => ({
+      ...skill,
+      // 只有「清单里有 + 占位注册成功」才算真禁用：同名冲突会让 register 抛错，那时不能谎报禁用。
+      enabled: !(this.skillsDisabled.has(skill.name) && this.shadowDisposers.has(skill.name)),
+    }))
   }
 
   /**
@@ -406,6 +423,7 @@ export class SkillMcpService extends Service {
         userInvocable: entry.invocation.userInvocable,
         writable: false,
         path: '',
+        enabled: true,
       })
     }
     return extra
@@ -432,6 +450,7 @@ export class SkillMcpService extends Service {
       userInvocable: true,
       writable: true,
       path,
+      enabled: true,
     }
   }
 
@@ -548,6 +567,82 @@ export class SkillMcpService extends Service {
     // 记「本次运行改过」：Loader 根树的 write 是 no-op（loader lib/index.js 的 `write() {}`），
     // 所以这里改的只是内存态；面板据此显示“重启后恢复”，而不是假装它是持久设置。
     this.sessionToggled.add(id)
+  }
+
+  /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
+  private disabledFile(): string {
+    const home = process.env.DSH_HOME ?? join(homedir(), '.dsh')
+    return join(home, 'skill-mcp-center', 'disabled-skills.json')
+  }
+
+  /**
+   * 读回落盘的禁用清单并重放遮蔽。为什么要自己存：registry 不提供「查看被遮蔽定义」的
+   * API（`The registry still exposes no API to inspect shadowed definitions`），
+   * 不落盘的话重启即失忆，面板开关就成了一次性的。
+   */
+  private async loadDisabledSkills(): Promise<void> {
+    if (!this.shadowsLoaded) {
+      this.shadowsLoaded = true
+      try {
+        const raw = JSON.parse(await readFile(this.disabledFile(), 'utf8')) as { names?: unknown }
+        if (Array.isArray(raw.names)) {
+          for (const name of raw.names) if (typeof name === 'string') this.skillsDisabled.add(name)
+        }
+      } catch {
+        // 文件不存在 / 损坏 = 没有禁用项。读失败不该让整个面板打不开。
+      }
+    }
+    // 每次调用都补齐缺失的占位：skills 服务可能晚于本插件就绪，只重放一次会永久失效。
+    for (const name of this.skillsDisabled) this.applyShadow(name)
+  }
+
+  private async persistDisabledSkills(): Promise<void> {
+    const file = this.disabledFile()
+    await mkdir(dirname(file), { recursive: true })
+    await writeFile(file, `${JSON.stringify({ names: [...this.skillsDisabled].sort() }, null, 2)}\n`, 'utf8')
+  }
+
+  /**
+   * 停用一条技能：注册同名占位——runtime rank（250）赢过包内 provider（≈550）与 bundled（600），
+   * 两个 invocation 都为 false，于是模型和人都调不到它，但它仍在 catalog 里、可被面板列出。
+   * 这是包内技能**唯一**可逆的停用方式：改名 / 移目录 / 断链对安装内容都不生效。
+   */
+  private applyShadow(name: string): void {
+    if (this.shadowDisposers.has(name)) return
+    const skills = this.ctx.get('skills')
+    if (skills === undefined) return
+    try {
+      this.shadowDisposers.set(name, skills.register({
+        name,
+        description: 'Disabled in the Skill & MCP panel.',
+        source: 'runtime',
+        content: '',
+        invocation: { modelInvocable: false, userInvocable: false },
+      }))
+    } catch {
+      // 名字不合法、或该名字的占位已存在：跳过。面板仍按清单显示禁用态，
+      // 调用方可从 listSkills 的实际 invocation 看出遮蔽没成功。
+    }
+  }
+
+  private removeShadow(name: string): void {
+    const dispose = this.shadowDisposers.get(name)
+    if (dispose === undefined) return
+    this.shadowDisposers.delete(name)
+    dispose()
+  }
+
+  /** 启用/停用一条技能。停用走占位遮蔽、启用调 disposer——不写 SKILL.md、不重启。 */
+  async setSkillEnabled(name: string, enabled: boolean): Promise<void> {
+    await this.loadDisabledSkills()
+    if (enabled) {
+      this.skillsDisabled.delete(name)
+      this.removeShadow(name)
+    } else {
+      this.skillsDisabled.add(name)
+      this.applyShadow(name)
+    }
+    await this.persistDisabledSkills()
   }
 
   /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */

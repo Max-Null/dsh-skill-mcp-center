@@ -25,6 +25,8 @@ export interface SkillView {
     writable: boolean;
     /** Absolute SKILL.md path (the toggle target; opaque to the client display). */
     path: string;
+    /** False when the panel disabled this skill; a runtime placeholder shadows the real definition. */
+    enabled: boolean;
 }
 /** Plugin configuration for the skill/MCP engine. */
 export interface SkillConfig {
@@ -155,6 +157,12 @@ export declare class SkillMcpService extends Service {
     private readonly officialSkillDirs;
     /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
     private readonly sessionToggled;
+    /** Skill names the panel disabled; runtime placeholders shadow the real definitions. */
+    private readonly skillsDisabled;
+    /** Live disposers for those shadow registrations, keyed by skill name. */
+    private readonly shadowDisposers;
+    /** Set once the disabled list has been read from disk and replayed. */
+    private shadowsLoaded;
     constructor(ctx: Context, config?: SkillConfig);
     /**
      * Skill roots that live **inside loaded plugin packages**.
@@ -218,6 +226,24 @@ export declare class SkillMcpService extends Service {
     removeMcpServer(id: string): Promise<void>;
     /** Enable/disable one server without deleting its config. The host does not persist this. */
     setMcpServerEnabled(id: string, enabled: boolean): Promise<void>;
+    /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
+    private disabledFile;
+    /**
+     * 读回落盘的禁用清单并重放遮蔽。为什么要自己存：registry 不提供「查看被遮蔽定义」的
+     * API（`The registry still exposes no API to inspect shadowed definitions`），
+     * 不落盘的话重启即失忆，面板开关就成了一次性的。
+     */
+    private loadDisabledSkills;
+    private persistDisabledSkills;
+    /**
+     * 停用一条技能：注册同名占位——runtime rank（250）赢过包内 provider（≈550）与 bundled（600），
+     * 两个 invocation 都为 false，于是模型和人都调不到它，但它仍在 catalog 里、可被面板列出。
+     * 这是包内技能**唯一**可逆的停用方式：改名 / 移目录 / 断链对安装内容都不生效。
+     */
+    private applyShadow;
+    private removeShadow;
+    /** 启用/停用一条技能。停用走占位遮蔽、启用调 disposer——不写 SKILL.md、不重启。 */
+    setSkillEnabled(name: string, enabled: boolean): Promise<void>;
     /** Runtime status per server: upstream `mcpStatus` seam when present, else derived. */
     mcpStatus(): Promise<McpServerStatus[]>;
 }

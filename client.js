@@ -217,6 +217,7 @@ var zhDict = {
   sectionSub: "\u7BA1\u7406\uFF08\u9759\u6001\u914D\u7F6E\uFF09\xB7 \u8FD0\u884C\u65F6\u72B6\u6001\u5728\u53F3\u4FA7\u8FB9\u680F",
   modelDisabled: "\u6A21\u578B\u5DF2\u505C\u7528",
   toggleModelVisible: "\u5207\u6362\u6A21\u578B\u53EF\u89C1",
+  toggleSkillEnabled: "\u542F\u7528 / \u505C\u7528\uFF08\u8FD0\u884C\u65F6\u906E\u853D\uFF0C\u5373\u65F6\u751F\u6548\uFF09",
   skillReadonly: "system/runtime \u6280\u80FD\u53EA\u8BFB",
   enable: "\u542F\u7528",
   disable: "\u505C\u7528",
@@ -284,6 +285,7 @@ var enDict = {
   sectionSub: "Manage (static config) \xB7 runtime status lives in the sidebar",
   modelDisabled: "Model disabled",
   toggleModelVisible: "Toggle model visibility",
+  toggleSkillEnabled: "Enable / disable (runtime shadow, applies immediately)",
   skillReadonly: "system/runtime skills are read-only",
   enable: "Enable",
   disable: "Disable",
@@ -458,8 +460,9 @@ function SkillView() {
   if (error !== null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loadFailed", { e: error }) });
   if (items === null) return /* @__PURE__ */ (0, import_jsx_runtime.jsx)("p", { className: "smc-sub", children: t("loading") });
   const toggle = (s) => {
-    setBusy(s.path);
-    void rpc("toggleSkill", { path: s.path }).then(
+    setBusy(skillKeyOf(s));
+    const call = s.writable ? rpc("toggleSkill", { path: s.path }) : rpc("setSkillEnabled", { name: s.name, enabled: !s.enabled });
+    void call.then(
       () => {
         setBusy(null);
         load();
@@ -535,19 +538,19 @@ function SkillView() {
             ]
           }
         ),
-        s.writable ? /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+        (s.writable || hasSkillFile(s)) && /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
           "button",
           {
             type: "button",
-            className: `smc-toggle${s.modelInvocable ? " on" : ""}`,
-            disabled: busy === s.path,
-            title: t("toggleModelVisible"),
+            className: `smc-toggle${(s.writable ? s.modelInvocable : s.enabled) ? " on" : ""}`,
+            disabled: busy === skillKeyOf(s),
+            title: s.writable ? t("toggleModelVisible") : t("toggleSkillEnabled"),
             onClick: () => {
               toggle(s);
             },
-            "aria-label": s.modelInvocable ? t("disable") : t("enable")
+            "aria-label": (s.writable ? s.modelInvocable : s.enabled) ? t("disable") : t("enable")
           }
-        ) : null,
+        ),
         /* @__PURE__ */ (0, import_jsx_runtime.jsx)("span", { className: `smc-chevron${open ? " open" : ""}` })
       ] }),
       open && /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-detail", children: [

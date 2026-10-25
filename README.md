@@ -29,6 +29,12 @@ DSH 的 `Loader.write()` 是空实现，面板上的启停只改内存树——�
 
 ![MCP 开关的效力边界](docs/shots/mcp-switch-session-only.png)
 
+### 设置页：插件技能的启停
+
+插件包内自带的技能没有可写的 `SKILL.md`——改名、移出目录、断链对安装内容都不生效（社区同类项目因此都只能显示「内置只读」）。这里改用 registry 的 rank 遮蔽：停用时注册一个同名占位技能（runtime rank 250 赢过包内 provider ≈550、bundled 600），两个 invocation 都设为 false，于是模型与人都调不到它，但它仍在 catalog 里、仍可被面板列出与管理；启用时调 disposer。停用清单落在 `$DSH_HOME/skill-mcp-center/disabled-skills.json`，重启后自动重放。
+
+![](docs/shots/skill-hotplug-toggle.png)
+
 ### 侧栏：Skill 一览
 
 搜索 + 命名空间筛选（全部 / 全局 / 工作区），每条带开关与 `MD`（查看 SKILL.md）。**插件包内自带的 skill 同样列出**，并标出来源插件——下图里 8 个 `ssid-*` 来自 `dsh-skills`，而用户级的 `ssid-release` 没有来源标签，这正是两者的区别：

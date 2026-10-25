@@ -2,6 +2,22 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [0.7.0] - 2026-10-26
+
+### Added
+
+**插件包内的技能可以启停了**（`#1` 的后半段）。它们没有可写的 `SKILL.md`，改名 / 移出目录 / 断链对安装内容都不生效（社区同类项目因此只能显示「内置只读」）。现在走 registry 的 rank 遮蔽：
+
+- **停用**：`ctx.skills.register()` 一个同名占位技能——runtime rank 250 赢过包内 provider ≈550 与 bundled 600，两个 invocation 都设为 false。技能仍在 catalog 里、仍可被面板列出，但模型与人都调不到它。
+- **启用**：调 disposer，恢复原本的 provider。
+- 停用清单落在 `$DSH_HOME/skill-mcp-center/disabled-skills.json` 并在启动后重放——registry 不提供「查看被遮蔽定义」的 API，不落盘就等于重启即失忆。
+- 面板的 `enabled` 只在「清单里有 **且** 占位注册成功」时为 false：同名冲突会让 `register()` 抛错，那时不能谎报禁用。
+
+### Changed
+
+- `SkillView` 新增 `enabled`；非磁盘技能（有路径但 `writable: false`）也显示开关，走新增的 `setSkillEnabled` RPC。
+- README 截图段补 Skill 标签页的插件技能启停。
+
 ## [0.6.5] - 2026-10-25
 
 ### Fixed
