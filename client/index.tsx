@@ -112,19 +112,6 @@ const CSS = `
 .smc-group .smc-count { font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-caption); }
 .smc-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); word-break: break-all; }
 .smc-detail-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-/* DSH 0.1.x 设置导航无 icon 契约（external section 一律默认齿轮）。settings-nav-icon
-   标记本插件行后：隐藏壳渲染的齿轮 SVG，用 Lucide wrench 的 currentColor mask 替换，
-   跟随原生导航 hover/active 颜色且不改变壳的 16px 图标节奏。 */
-[data-dsh-skill-mcp-center-settings-nav] > svg:first-child { display: none; }
-[data-dsh-skill-mcp-center-settings-nav]::before {
-  content: '';
-  flex: none;
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
 `
 let cssInjected = false
 function injectCss(): void {
@@ -137,32 +124,16 @@ function injectCss(): void {
 }
 
 // ---- settings nav icon ----
-// DSH 0.1.x 的 settings.section 注册只投影 id/order/label，设置壳对外部 section
-// 一律渲染默认齿轮（无 icon 契约字段）。照 dsh-better-sidebar 的 settings-nav-icon
-// 模式：MutationObserver 按 label 文本标记设置对话框里本插件那一行，由上面的
-// CSS 把齿轮替换成扳手。标记不拥有壳结构，disposer 移除标记，HMR-safe。
-const SETTINGS_NAV_MARKER = 'data-dsh-skill-mcp-center-settings-nav'
-function registerSettingsNavIcon(label: () => string): () => void {
-  let disposed = false
-  const sync = (): void => {
-    if (disposed) return
-    const currentLabel = label().trim()
-    const buttons = document.querySelectorAll<HTMLButtonElement>('[role="dialog"] nav button')
-    for (const button of buttons) {
-      const matches = currentLabel.length > 0 && button.textContent?.trim() === currentLabel
-      if (matches) button.setAttribute(SETTINGS_NAV_MARKER, '')
-      else button.removeAttribute(SETTINGS_NAV_MARKER)
-    }
-  }
-  sync()
-  const observer = new MutationObserver(sync)
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true })
-  return () => {
-    disposed = true
-    observer.disconnect()
-    document.querySelectorAll(`[${SETTINGS_NAV_MARKER}]`)
-      .forEach((element) => { element.removeAttribute(SETTINGS_NAV_MARKER) })
-  }
+// DSH 0.2.2-rc.1 起设置导航图标有了契约插槽（settings.section.icon，按 section id 取图）。
+// 旧做法（MutationObserver 标记导航行 + ::before mask、隐藏默认齿轮）依赖 svg 是按钮的
+// 直接子元素；新宿主把它包进 span.navIcon 后选择器失配，齿轮重新露出 → 双图标。
+function NavIcon({ size }: { size: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" />
+    </svg>
+  )
 }
 
 // ---- locale (DSH zh/en bilingual, follows the active UI language) ----
@@ -1075,8 +1046,11 @@ function apply(ctx: {
     localeListeners.forEach(l => l())
   }))
 
-  // 设置导航图标：标记本插件行后由 CSS 把默认齿轮替换为扳手（HMR-safe）。
-  ctx.effect(() => registerSettingsNavIcon(() => 'Skill & MCP'))
+  // 设置导航图标：注册宿主 settings.section.icon 插槽（DSH 0.2.2-rc.1 起），
+  // 宿主按 section id 取图并替代默认齿轮；旧 DOM 标记方案在新结构下会双图标。
+  ctx.slots.inject('settings.section.icon', () => ctx.slots.register({
+    name: 'settings.section.icon', id: 'skill-mcp-center', order: 60, label: () => 'Skill & MCP',
+  }, (props: { size?: number }) => <NavIcon size={props?.size ?? 16} />))
 
   ctx.slots.inject('settings.section', () => ctx.slots.register({
     name: 'settings.section', id: 'skill-mcp-center', order: 60, label: () => 'Skill & MCP',

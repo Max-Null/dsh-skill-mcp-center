@@ -146,19 +146,6 @@ var CSS = `
 .smc-group .smc-count { font-size: 11px; font-weight: 400; color: var(--dsw-alias-label-caption); }
 .smc-detail { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--dsw-alias-border-l1); font-size: 12px; color: var(--dsw-alias-label-secondary); word-break: break-all; }
 .smc-detail-row { display: flex; align-items: center; gap: 6px; margin-top: 4px; }
-/* DSH 0.1.x \u8BBE\u7F6E\u5BFC\u822A\u65E0 icon \u5951\u7EA6\uFF08external section \u4E00\u5F8B\u9ED8\u8BA4\u9F7F\u8F6E\uFF09\u3002settings-nav-icon
-   \u6807\u8BB0\u672C\u63D2\u4EF6\u884C\u540E\uFF1A\u9690\u85CF\u58F3\u6E32\u67D3\u7684\u9F7F\u8F6E SVG\uFF0C\u7528 Lucide wrench \u7684 currentColor mask \u66FF\u6362\uFF0C
-   \u8DDF\u968F\u539F\u751F\u5BFC\u822A hover/active \u989C\u8272\u4E14\u4E0D\u6539\u53D8\u58F3\u7684 16px \u56FE\u6807\u8282\u594F\u3002 */
-[data-dsh-skill-mcp-center-settings-nav] > svg:first-child { display: none; }
-[data-dsh-skill-mcp-center-settings-nav]::before {
-  content: '';
-  flex: none;
-  width: 16px;
-  height: 16px;
-  background: currentColor;
-  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z'/%3E%3C/svg%3E") center / contain no-repeat;
-  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z'/%3E%3C/svg%3E") center / contain no-repeat;
-}
 `;
 var cssInjected = false;
 function injectCss() {
@@ -169,29 +156,22 @@ function injectCss() {
   style.textContent = CSS;
   document.head.append(style);
 }
-var SETTINGS_NAV_MARKER = "data-dsh-skill-mcp-center-settings-nav";
-function registerSettingsNavIcon(label) {
-  let disposed = false;
-  const sync = () => {
-    if (disposed) return;
-    const currentLabel = label().trim();
-    const buttons = document.querySelectorAll('[role="dialog"] nav button');
-    for (const button of buttons) {
-      const matches = currentLabel.length > 0 && button.textContent?.trim() === currentLabel;
-      if (matches) button.setAttribute(SETTINGS_NAV_MARKER, "");
-      else button.removeAttribute(SETTINGS_NAV_MARKER);
+function NavIcon({ size }) {
+  return /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+    "svg",
+    {
+      width: size,
+      height: size,
+      viewBox: "0 0 24 24",
+      fill: "none",
+      stroke: "currentColor",
+      strokeWidth: 2,
+      strokeLinecap: "round",
+      strokeLinejoin: "round",
+      "aria-hidden": "true",
+      children: /* @__PURE__ */ (0, import_jsx_runtime.jsx)("path", { d: "M14.7 6.3a1 1 0 0 0 0 1.4l1.6 1.6a1 1 0 0 0 1.4 0l3.106-3.105c.32-.322.863-.22.983.218a6 6 0 0 1-8.259 7.057l-7.91 7.91a1 1 0 0 1-2.999-3l7.91-7.91a6 6 0 0 1 7.057-8.259c.438.12.54.662.219.984z" })
     }
-  };
-  sync();
-  const observer = new MutationObserver(sync);
-  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
-  return () => {
-    disposed = true;
-    observer.disconnect();
-    document.querySelectorAll(`[${SETTINGS_NAV_MARKER}]`).forEach((element) => {
-      element.removeAttribute(SETTINGS_NAV_MARKER);
-    });
-  };
+  );
 }
 var LOCALE_NS = "@max-null/dsh-skill-mcp-center";
 var t = (key) => key;
@@ -1072,7 +1052,12 @@ function apply(ctx) {
     localeRevision += 1;
     localeListeners.forEach((l) => l());
   }));
-  ctx.effect(() => registerSettingsNavIcon(() => "Skill & MCP"));
+  ctx.slots.inject("settings.section.icon", () => ctx.slots.register({
+    name: "settings.section.icon",
+    id: "skill-mcp-center",
+    order: 60,
+    label: () => "Skill & MCP"
+  }, (props) => /* @__PURE__ */ (0, import_jsx_runtime.jsx)(NavIcon, { size: props?.size ?? 16 })));
   ctx.slots.inject("settings.section", () => ctx.slots.register({
     name: "settings.section",
     id: "skill-mcp-center",
