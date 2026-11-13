@@ -243,7 +243,16 @@ export declare class SkillMcpService extends Service {
      * fields use, and the existing `disabled:` line when the file pins one.
      * 按行定位而不是解析后再序列化：后者会丢掉作者的注释与字段顺序。
      */
+    /**
+     * Loader ids of entries inside an Include carry the Include id as a prefix
+     * (`include:rea-mcp`), while the patch file stores the bare id (`rea-mcp`).
+     * Real DSH composes the global patch layer as an Include, so a runtime id is
+     * the only id this code ever sees from the panel.
+     */
+    private entryIdCandidates;
+    /** Match the exact id first, then each prefix-stripped alias. */
     private locatePatchEntry;
+    private locatePatchEntryById;
     /** Entry id → whether some writable patch file pins `disabled: true` on it. */
     private patchDisabledState;
     /**

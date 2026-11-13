@@ -438,7 +438,7 @@ export class SkillMcpService extends Service {
                 headers: cfg?.headers,
                 disabled: entry.disabled,
                 sessionToggled: this.sessionToggled.has(entry.id),
-                permanentDisabled: permanent.get(entry.id) === true,
+                permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => permanent.get(candidate) === true),
                 fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
             });
         }
@@ -491,7 +491,32 @@ export class SkillMcpService extends Service {
      * fields use, and the existing `disabled:` line when the file pins one.
      * 按行定位而不是解析后再序列化：后者会丢掉作者的注释与字段顺序。
      */
+    /**
+     * Loader ids of entries inside an Include carry the Include id as a prefix
+     * (`include:rea-mcp`), while the patch file stores the bare id (`rea-mcp`).
+     * Real DSH composes the global patch layer as an Include, so a runtime id is
+     * the only id this code ever sees from the panel.
+     */
+    entryIdCandidates(id) {
+        const candidates = [id];
+        let rest = id;
+        while (rest.includes(':')) {
+            rest = rest.slice(rest.indexOf(':') + 1);
+            if (rest !== '')
+                candidates.push(rest);
+        }
+        return candidates;
+    }
+    /** Match the exact id first, then each prefix-stripped alias. */
     locatePatchEntry(lines, id) {
+        for (const candidate of this.entryIdCandidates(id)) {
+            const hit = this.locatePatchEntryById(lines, candidate);
+            if (hit !== null)
+                return hit;
+        }
+        return null;
+    }
+    locatePatchEntryById(lines, id) {
         const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const head = new RegExp(`^(\\s*)-\\s*id:\\s*['"]?${escaped}['"]?\\s*$`);
         for (let start = 0; start < lines.length; start += 1) {

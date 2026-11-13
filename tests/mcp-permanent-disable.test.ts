@@ -140,3 +140,41 @@ describe('MCP 永久禁用', () => {
     expect(text.replace(/\r\n/g, '')).not.toContain('\n')
   })
 })
+
+/**
+ * 真实 DSH 里全局 patch 被挂成一个 Include 节点，子条目的运行时 id 带上了
+ * Include 前缀（`include:rea-mcp`），而文件里存的是裸 id（`rea-mcp`）。
+ * 面板与 RPC 拿到的永远是运行时 id——不做前缀归一就会报
+ * `entry "include:rea-mcp" is not in any writable cordis.patch.yml`。
+ */
+describe('永久禁用：Include 前缀的运行时 id', () => {
+  it('用 include: 前缀的 id 也能写入并查回', async () => {
+    const service = makeService([mcpEntry('include:rea-mcp', 'rea')])
+    const result = await service.setMcpPermanentDisabled('include:rea-mcp', true)
+    expect(result.changed).toBe(true)
+
+    const text = await readFile(patch, 'utf8')
+    expect(text).toContain('\n      disabled: true\n      name:')
+    expect(text.startsWith('# 全局 patch 层')).toBe(true)
+
+    // 状态表的键是文件里的裸 id，查表要能按运行时 id 命中。
+    expect((await service.patchDisabledState()).get('rea-mcp')).toBe(true)
+    expect((await service.listMcpServers())[0].permanentDisabled).toBe(true)
+  })
+
+  it('嵌套 include 前缀同样能逐层剥掉', async () => {
+    const service = makeService()
+    await service.setMcpPermanentDisabled('include:sub:rea-mcp', true)
+    expect((await readFile(patch, 'utf8'))).toContain('\n      disabled: true\n      name:')
+    await service.setMcpPermanentDisabled('include:sub:rea-mcp', false)
+    expect(await readFile(patch, 'utf8')).toBe(PATCH)
+  })
+
+  it('运行时 id 解除后同样字节级还原', async () => {
+    const service = makeService()
+    await service.setMcpPermanentDisabled('include:rea-mcp', true)
+    await service.setMcpPermanentDisabled('include:rea-mcp', false)
+    expect(await readFile(patch, 'utf8')).toBe(PATCH)
+    expect((await service.listMcpServers())[0].permanentDisabled).toBe(false)
+  })
+})
