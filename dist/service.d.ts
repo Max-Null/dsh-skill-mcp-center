@@ -51,6 +51,12 @@ export interface McpServer {
      * labelled as session-only.
      */
     sessionToggled: boolean;
+    /**
+     * True when an editable patch file pins `disabled: true` on this entry, so the
+     * switch survives a restart. Distinct from `sessionToggled`: a persistent
+     * entry disabled from a patch must not be labelled "reverted on restart".
+     */
+    permanentDisabled: boolean;
     fiberPhase: string | null;
 }
 /** One tool a server contributes, as the management surface lists it. */
@@ -226,6 +232,32 @@ export declare class SkillMcpService extends Service {
     removeMcpServer(id: string): Promise<void>;
     /** Enable/disable one server without deleting its config. The host does not persist this. */
     setMcpServerEnabled(id: string, enabled: boolean): Promise<void>;
+    /**
+     * Writable patch files that may own one loader entry: the global layer first,
+     * then each profile's own patch layer. Entries shipped inside a package's own
+     * bundled patch are not reachable here — those are read-only templates.
+     */
+    private patchFiles;
+    /**
+     * Locate `- id: <id>` in one patch file: its line, the indent its sibling
+     * fields use, and the existing `disabled:` line when the file pins one.
+     * 按行定位而不是解析后再序列化：后者会丢掉作者的注释与字段顺序。
+     */
+    private locatePatchEntry;
+    /** Entry id → whether some writable patch file pins `disabled: true` on it. */
+    private patchDisabledState;
+    /**
+     * Pin or unpin `disabled` for one entry in the writable patch file that owns
+     * it, then apply the same state to the running tree.
+     *
+     * 面板上的开关只能改内存树（宿主把 Loader 根树的 write 做成空实现），所以
+     * 「重启后仍然关」必须落在 patch 文件本身。这一次调用两件事一起做：写盘 + 热生效。
+     */
+    setMcpPermanentDisabled(id: string, disabled: boolean): Promise<{
+        file: string;
+        disabled: boolean;
+        changed: boolean;
+    }>;
     /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
     private disabledFile;
     /**

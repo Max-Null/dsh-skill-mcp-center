@@ -162,6 +162,8 @@ async function dispatch(ctx: Context, body: SkillMcpRequest): Promise<RpcResult<
         return { ok: true, value: await ctx.skillMcp.removeMcpServer(String(p.id)) }
       case 'setMcpServerEnabled':
         return { ok: true, value: await ctx.skillMcp.setMcpServerEnabled(String(p.id), p.enabled === true) }
+      case 'setMcpServerPermanent':
+        return { ok: true, value: await ctx.skillMcp.setMcpPermanentDisabled(String(p.id), p.disabled === true) }
       case 'mcpStatus':
         return { ok: true, value: await ctx.skillMcp.mcpStatus() }
       default:
