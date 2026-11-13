@@ -415,6 +415,7 @@ export class SkillMcpService extends Service {
     /** Every `mcp-client` loader entry as a server card. */
     async listMcpServers() {
         const servers = [];
+        const permanent = await this.patchDisabledState();
         for (const entry of this.ctx.loader.entries()) {
             // The official bridge's specifier is the package name, not its internal
             // plugin `name` ('mcp-client'); one entry = one MCP server.
@@ -437,6 +438,7 @@ export class SkillMcpService extends Service {
                 headers: cfg?.headers,
                 disabled: entry.disabled,
                 sessionToggled: this.sessionToggled.has(entry.id),
+                permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => permanent.get(candidate) === true),
                 fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
             });
         }
@@ -464,6 +466,164 @@ export class SkillMcpService extends Service {
         // 记「本次运行改过」：Loader 根树的 write 是 no-op（loader lib/index.js 的 `write() {}`），
         // 所以这里改的只是内存态；面板据此显示“重启后恢复”，而不是假装它是持久设置。
         this.sessionToggled.add(id);
+    }
+    /**
+     * Writable patch files that may own one loader entry: the global layer first,
+     * then each profile's own patch layer. Entries shipped inside a package's own
+     * bundled patch are not reachable here — those are read-only templates.
+     */
+    async patchFiles() {
+        const home = process.env.DSH_HOME ?? join(homedir(), '.dsh');
+        const files = [join(home, 'cordis.patch.yml')];
+        try {
+            const entries = await readdir(join(home, 'profiles'), { withFileTypes: true });
+            for (const dirent of entries)
+                if (dirent.isDirectory())
+                    files.push(join(home, 'profiles', dirent.name, 'cordis.patch.yml'));
+        }
+        catch {
+            // 没有 profiles 目录就是单 profile 部署：全局层仍然可写。
+        }
+        return files;
+    }
+    /**
+     * Locate `- id: <id>` in one patch file: its line, the indent its sibling
+     * fields use, and the existing `disabled:` line when the file pins one.
+     * 按行定位而不是解析后再序列化：后者会丢掉作者的注释与字段顺序。
+     */
+    /**
+     * Loader ids of entries inside an Include carry the Include id as a prefix
+     * (`include:rea-mcp`), while the patch file stores the bare id (`rea-mcp`).
+     * Real DSH composes the global patch layer as an Include, so a runtime id is
+     * the only id this code ever sees from the panel.
+     */
+    entryIdCandidates(id) {
+        const candidates = [id];
+        let rest = id;
+        while (rest.includes(':')) {
+            rest = rest.slice(rest.indexOf(':') + 1);
+            if (rest !== '')
+                candidates.push(rest);
+        }
+        return candidates;
+    }
+    /** Match the exact id first, then each prefix-stripped alias. */
+    locatePatchEntry(lines, id) {
+        for (const candidate of this.entryIdCandidates(id)) {
+            const hit = this.locatePatchEntryById(lines, candidate);
+            if (hit !== null)
+                return hit;
+        }
+        return null;
+    }
+    locatePatchEntryById(lines, id) {
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const head = new RegExp(`^(\\s*)-\\s*id:\\s*['"]?${escaped}['"]?\\s*$`);
+        for (let start = 0; start < lines.length; start += 1) {
+            const line = lines[start];
+            if (line === undefined)
+                continue;
+            const match = head.exec(line);
+            if (match === null)
+                continue;
+            const indent = (match[1] ?? '').length;
+            let end = start + 1;
+            while (end < lines.length) {
+                const text = lines[end];
+                if (text === undefined)
+                    break;
+                if (text.trim() !== '') {
+                    const own = text.length - text.trimStart().length;
+                    if (own < indent || (own === indent && text.trimStart().startsWith('- ')))
+                        break;
+                }
+                end += 1;
+            }
+            let disabledAt = -1;
+            for (let i = start + 1; i < end; i += 1) {
+                const candidate = lines[i];
+                if (candidate !== undefined && /^\s*disabled:\s*\S/.test(candidate)) {
+                    disabledAt = i;
+                    break;
+                }
+            }
+            return { start, end, fieldIndent: indent + 2, disabledAt };
+        }
+        return null;
+    }
+    /** Entry id → whether some writable patch file pins `disabled: true` on it. */
+    async patchDisabledState() {
+        const state = new Map();
+        for (const file of await this.patchFiles()) {
+            const text = await readFile(file, 'utf8').catch(() => null);
+            if (text === null)
+                continue;
+            const lines = text.split(/\r?\n/);
+            const ids = /^(\s*)-\s*id:\s*['"]?([A-Za-z0-9_.:-]+)['"]?\s*$/;
+            for (let i = 0; i < lines.length; i += 1) {
+                const line = lines[i];
+                if (line === undefined)
+                    continue;
+                const match = ids.exec(line);
+                if (match === null)
+                    continue;
+                const found = match[2];
+                if (found === undefined)
+                    continue;
+                const hit = this.locatePatchEntry(lines, found);
+                if (hit === null)
+                    continue;
+                const pinned = hit.disabledAt < 0 ? undefined : lines[hit.disabledAt];
+                state.set(found, pinned !== undefined && /^\s*disabled:\s*true\s*$/.test(pinned));
+            }
+        }
+        return state;
+    }
+    /**
+     * Pin or unpin `disabled` for one entry in the writable patch file that owns
+     * it, then apply the same state to the running tree.
+     *
+     * 面板上的开关只能改内存树（宿主把 Loader 根树的 write 做成空实现），所以
+     * 「重启后仍然关」必须落在 patch 文件本身。这一次调用两件事一起做：写盘 + 热生效。
+     */
+    async setMcpPermanentDisabled(id, disabled) {
+        for (const file of await this.patchFiles()) {
+            const text = await readFile(file, 'utf8').catch(() => null);
+            if (text === null)
+                continue;
+            const eol = text.includes('\r\n') ? '\r\n' : '\n';
+            const lines = text.split(/\r?\n/);
+            const hit = this.locatePatchEntry(lines, id);
+            if (hit === null)
+                continue;
+            const pad = ' '.repeat(hit.fieldIndent);
+            const pinned = hit.disabledAt < 0 ? undefined : lines[hit.disabledAt];
+            let changed = true;
+            if (disabled) {
+                if (hit.disabledAt >= 0) {
+                    if (pinned !== undefined && /^\s*disabled:\s*true\s*$/.test(pinned))
+                        changed = false;
+                    else
+                        lines[hit.disabledAt] = `${pad}disabled: true`;
+                }
+                else
+                    lines.splice(hit.start + 1, 0, `${pad}disabled: true`);
+            }
+            else if (hit.disabledAt < 0)
+                changed = false;
+            else
+                lines.splice(hit.disabledAt, 1);
+            if (changed) {
+                const temp = `${file}.${process.pid}`;
+                await writeFile(temp, lines.join(eol), 'utf8');
+                await rename(temp, file);
+            }
+            await this.ctx.loader.update(id, { disabled: disabled ? true : null });
+            // 已不再是「本次运行改过」——重启后它仍然关着。
+            this.sessionToggled.delete(id);
+            return { file, disabled, changed };
+        }
+        throw new Error(`entry "${id}" is not in any writable cordis.patch.yml (it may come from a bundled patch)`);
     }
     /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
     disabledFile() {

@@ -167,6 +167,14 @@ const zhDict: Record<string, string> = {
   hotApplied: '增删改热生效，免重启',
   switchSessionOnly: '开关只对本次运行生效，重启后恢复（要长期禁用，给该条目加 disabled: true）',
   switchReverted: '本次运行已停用 · 重启恢复',
+  permanentDisable: '永久禁用',
+  permanentEnable: '解除持久禁用',
+  permanentDisableHint: '在 cordis.patch.yml 写入 disabled: true，重启后仍生效',
+  permanentEnableHint: '从 cordis.patch.yml 移除 disabled: true，重启后恢复启用',
+  permanentOn: '已在 cordis.patch.yml 持久禁用（disabled: true），重启后仍生效',
+  permanentDisabledToast: '已写入 disabled: true，重启后仍禁用',
+  permanentEnabledToast: '已移除 disabled: true，重启后恢复启用',
+  permanentUnchanged: '配置文件已是目标状态，无需修改',
   edit: '编辑',
   remove: '删除',
   disableServer: '停用（断开并释放 context）',
@@ -235,6 +243,14 @@ const enDict: Record<string, string> = {
   hotApplied: 'hot-applied, no restart',
   switchSessionOnly: 'switch applies to this run only, reverted after restart (to disable for good, add disabled: true to the entry)',
   switchReverted: 'disabled for this run · restored on restart',
+  permanentDisable: 'Disable for good',
+  permanentEnable: 'Lift persistent disable',
+  permanentDisableHint: 'write disabled: true into cordis.patch.yml, survives restart',
+  permanentEnableHint: 'remove disabled: true from cordis.patch.yml, re-enabled after restart',
+  permanentOn: 'pinned disabled: true in cordis.patch.yml — stays off after restart',
+  permanentDisabledToast: 'Wrote disabled: true, stays off after restart',
+  permanentEnabledToast: 'Removed disabled: true, enabled after restart',
+  permanentUnchanged: 'config file already in the target state',
   edit: 'Edit',
   remove: 'Remove',
   disableServer: 'Disable (disconnect & free context)',
@@ -313,6 +329,8 @@ interface McpServer {
   disabled: boolean
   /** 本次运行被面板改过开关——host 侧内存态，重启即清空。 */
   sessionToggled?: boolean
+  /** 可写 patch 里给该条目钉了 disabled: true——重启后仍然关。 */
+  permanentDisabled?: boolean
   fiberPhase: string | null
 }
 /** One tool a server contributes, as the surface lists it. */
@@ -610,6 +628,22 @@ function McpView() {
       e => { showToast(e instanceof Error ? e.message : String(e), 'error') },
     )
   }
+  const permanentToggle = (s: McpServer) => {
+    void rpc('setMcpServerPermanent', { id: s.id, disabled: s.permanentDisabled !== true }).then(
+      result => {
+        const changed = (result as { changed?: boolean } | null)?.changed !== false
+        load()
+        showToast(
+          !changed
+            ? t('permanentUnchanged')
+            : s.permanentDisabled === true
+              ? t('permanentEnabledToast')
+              : t('permanentDisabledToast'),
+        )
+      },
+      e => { showToast(e instanceof Error ? e.message : String(e), 'error') },
+    )
+  }
   const remove = (s: McpServer) => {
     void rpc('removeMcpServer', { id: s.id }).then(
       () => { load(); showToast(t('removed', { name: s.serverName })) },
@@ -642,8 +676,19 @@ function McpView() {
               onClick={() => { toggle(s) }}
               aria-label={s.disabled ? t('enable') : t('disable')}
             />
+            <button
+              type="button"
+              className={`smc-btn${s.permanentDisabled === true ? '' : ' danger'}`}
+              title={s.permanentDisabled === true ? t('permanentEnableHint') : t('permanentDisableHint')}
+              onClick={() => { permanentToggle(s) }}
+            >
+              {s.permanentDisabled === true ? t('permanentEnable') : t('permanentDisable')}
+            </button>
           </div>
           <div className="smc-desc">{s.transport === 'stdio' ? `${s.command ?? ''} ${(s.args ?? []).join(' ')}` : s.url}</div>
+          {s.permanentDisabled === true && (
+            <div className="smc-desc">{t('permanentOn')}</div>
+          )}
           {s.disabled && s.sessionToggled === true && (
             <div className="smc-desc">{t('switchReverted')}</div>
           )}

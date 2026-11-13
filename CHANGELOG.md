@@ -2,6 +2,17 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+
+**MCP 的「永久禁用」按钮**：面板原有的启停只改内存树（宿主把 Loader 根树的 `write` 做成空实现），重启即恢复；现在卡片上多一个按钮，把 `disabled: true` 写进可写的 `cordis.patch.yml`，重启后仍然关闭。再点一次删掉该行恢复启用。
+
+- 写入按行插入/删除，不做 YAML 解析后再序列化，因此注释、空行、字段顺序与 CRLF 全部保留；写入走临时文件 + `rename`。
+- 同一个调用里同时 `loader.update` 热生效，并清掉 `sessionToggled` 记账——持久禁用不再是「重启会恢复」的临时态。
+- `McpServer` 新增 `permanentDisabled`；条目若来自插件包内置 patch（不可写）则明确报错，不猜路径。
+- 新增端点 `setMcpServerPermanent` 与 7 条测试（插入位置、幂等、解除后字节级还原、CRLF、不可写条目）。
+
 ## [0.7.1] - 2026-11-13
 
 ### Fixed

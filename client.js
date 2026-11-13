@@ -206,6 +206,14 @@ var zhDict = {
   hotApplied: "\u589E\u5220\u6539\u70ED\u751F\u6548\uFF0C\u514D\u91CD\u542F",
   switchSessionOnly: "\u5F00\u5173\u53EA\u5BF9\u672C\u6B21\u8FD0\u884C\u751F\u6548\uFF0C\u91CD\u542F\u540E\u6062\u590D\uFF08\u8981\u957F\u671F\u7981\u7528\uFF0C\u7ED9\u8BE5\u6761\u76EE\u52A0 disabled: true\uFF09",
   switchReverted: "\u672C\u6B21\u8FD0\u884C\u5DF2\u505C\u7528 \xB7 \u91CD\u542F\u6062\u590D",
+  permanentDisable: "\u6C38\u4E45\u7981\u7528",
+  permanentEnable: "\u89E3\u9664\u6301\u4E45\u7981\u7528",
+  permanentDisableHint: "\u5728 cordis.patch.yml \u5199\u5165 disabled: true\uFF0C\u91CD\u542F\u540E\u4ECD\u751F\u6548",
+  permanentEnableHint: "\u4ECE cordis.patch.yml \u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
+  permanentOn: "\u5DF2\u5728 cordis.patch.yml \u6301\u4E45\u7981\u7528\uFF08disabled: true\uFF09\uFF0C\u91CD\u542F\u540E\u4ECD\u751F\u6548",
+  permanentDisabledToast: "\u5DF2\u5199\u5165 disabled: true\uFF0C\u91CD\u542F\u540E\u4ECD\u7981\u7528",
+  permanentEnabledToast: "\u5DF2\u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
+  permanentUnchanged: "\u914D\u7F6E\u6587\u4EF6\u5DF2\u662F\u76EE\u6807\u72B6\u6001\uFF0C\u65E0\u9700\u4FEE\u6539",
   edit: "\u7F16\u8F91",
   remove: "\u5220\u9664",
   disableServer: "\u505C\u7528\uFF08\u65AD\u5F00\u5E76\u91CA\u653E context\uFF09",
@@ -274,6 +282,14 @@ var enDict = {
   hotApplied: "hot-applied, no restart",
   switchSessionOnly: "switch applies to this run only, reverted after restart (to disable for good, add disabled: true to the entry)",
   switchReverted: "disabled for this run \xB7 restored on restart",
+  permanentDisable: "Disable for good",
+  permanentEnable: "Lift persistent disable",
+  permanentDisableHint: "write disabled: true into cordis.patch.yml, survives restart",
+  permanentEnableHint: "remove disabled: true from cordis.patch.yml, re-enabled after restart",
+  permanentOn: "pinned disabled: true in cordis.patch.yml \u2014 stays off after restart",
+  permanentDisabledToast: "Wrote disabled: true, stays off after restart",
+  permanentEnabledToast: "Removed disabled: true, enabled after restart",
+  permanentUnchanged: "config file already in the target state",
   edit: "Edit",
   remove: "Remove",
   disableServer: "Disable (disconnect & free context)",
@@ -626,6 +642,20 @@ function McpView() {
       }
     );
   };
+  const permanentToggle = (s) => {
+    void rpc("setMcpServerPermanent", { id: s.id, disabled: s.permanentDisabled !== true }).then(
+      (result) => {
+        const changed = result?.changed !== false;
+        load();
+        showToast(
+          !changed ? t("permanentUnchanged") : s.permanentDisabled === true ? t("permanentEnabledToast") : t("permanentDisabledToast")
+        );
+      },
+      (e) => {
+        showToast(e instanceof Error ? e.message : String(e), "error");
+      }
+    );
+  };
   const remove = (s) => {
     void rpc("removeMcpServer", { id: s.id }).then(
       () => {
@@ -676,9 +706,22 @@ function McpView() {
             },
             "aria-label": s.disabled ? t("enable") : t("disable")
           }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: `smc-btn${s.permanentDisabled === true ? "" : " danger"}`,
+            title: s.permanentDisabled === true ? t("permanentEnableHint") : t("permanentDisableHint"),
+            onClick: () => {
+              permanentToggle(s);
+            },
+            children: s.permanentDisabled === true ? t("permanentEnable") : t("permanentDisable")
+          }
         )
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: s.transport === "stdio" ? `${s.command ?? ""} ${(s.args ?? []).join(" ")}` : s.url }),
+      s.permanentDisabled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("permanentOn") }),
       s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
     ] }, s.id))
   ] });

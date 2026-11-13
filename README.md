@@ -11,7 +11,7 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 ## Features / 功能
 
 - **Skill management / Skill 管理** — browse every skill grouped by source (Global / Workspace / Built-in DSH official, plus one group per plugin that ships skills), toggle model invocation via the `disable-model-invocation` frontmatter (disk-backed skills only). Covers skills shipped **inside plugin packages** (e.g. `@max-null/dsh-skills`), not just the user-level roots — the host-level skill filesystem is disabled in web-app, so a plugin's own `skills/` directory would otherwise be invisible while its skills are loaded and in effect. Also covers a plugin that mounts `@deepseek-ai/dsh-skill-filesystem` under an id of its own and points `bundledSkillDir` at its skills (e.g. `dsh-plugin-zhihu-search`), including when the patch computes that path with a `!!js` expression — such a path is read from the entry's fiber, where the Loader has already evaluated it. **Deleting** a user-level or project-level skill is offered on the same rows, behind a confirmation that names the skill and its path; the entry is *moved* to `~/.dsh/.skill-trash/` rather than destroyed, so a mistaken deletion stays recoverable. Plugin and built-in skills stay read-only.
-- **MCP management / MCP 管理** — add / edit / remove `mcp-client` servers, enable/disable without deleting config, all **hot-applied** through `ctx.loader` (no restart).
+- **MCP management / MCP 管理** — add / edit / remove `mcp-client` servers, enable/disable without deleting config, all **hot-applied** through `ctx.loader` (no restart). A **永久禁用 / Disable for good** button on each card writes `disabled: true` into an editable `cordis.patch.yml`, so that switch survives a restart.
 - **Live status / 实时状态** — a sidebar "MCP" tab (via `dsh-better-sidebar`) showing per-server connection state; **click a server row to expand its tools' names and descriptions** (collapsed by default — a server can expose dozens of them). Names come from `tools.schemas()`; the redundant `mcp__<server>__` prefix is hidden while the full name stays on hover. Polled while visible and following the session.
 - **Skin-compatible / 皮肤兼容** — every color uses `var(--dsw-*)` tokens.
 
@@ -26,6 +26,8 @@ Skill 与 MCP 管理中心：在设置里管理 skills 与 MCP 服务器，右�
 ### 设置页：MCP 开关的效力边界
 
 DSH 的 `Loader.write()` 是空实现，面板上的启停只改内存树——所以 MCP 标签页顶部写明「开关只对本次运行生效，重启后恢复」；要长期禁用，给 `cordis.patch.yml` 的对应条目加 `disabled: true`。被面板关掉的条目会在卡片里标「本次运行已停用 · 重启恢复」，而 patch 里持久禁用的条目不标——两种「关」必须能区分：
+
+卡片上的「永久禁用」按钮代劳这一步：它把 `disabled: true` 写进可写的 `cordis.patch.yml`（按行插入/删除，保留注释、字段顺序与 CRLF，写入走临时文件 + `rename`），并在同一次调用里 `loader.update` 热生效；已持久禁用的卡片会多一行「已在 cordis.patch.yml 持久禁用」，再点「解除持久禁用」即删掉那一行。条目若来自插件包内置的 patch（不可写），按钮会明确报错而不是猜路径。
 
 ![MCP 开关的效力边界](docs/shots/mcp-switch-session-only.png)
 
