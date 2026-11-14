@@ -204,8 +204,20 @@ var zhDict = {
   provider: "provider \xB7 {name}",
   addServer: "\uFF0B \u6DFB\u52A0 server",
   hotApplied: "\u589E\u5220\u6539\u70ED\u751F\u6548\uFF0C\u514D\u91CD\u542F",
-  switchSessionOnly: "\u5F00\u5173\u53EA\u5BF9\u672C\u6B21\u8FD0\u884C\u751F\u6548\uFF0C\u91CD\u542F\u540E\u6062\u590D\uFF08\u8981\u957F\u671F\u7981\u7528\uFF0C\u7ED9\u8BE5\u6761\u76EE\u52A0 disabled: true\uFF09",
+  switchSessionOnly: "\u5F00\u5173\u53EA\u5BF9\u672C\u6B21\u8FD0\u884C\u751F\u6548\uFF0C\u91CD\u542F\u540E\u6062\u590D\uFF1B\u8981\u957F\u671F\u5173\u6389\uFF0C\u7528\u5361\u7247\u4E0A\u7684\u300C\u6C38\u4E45\u7981\u7528\u300D",
   switchReverted: "\u672C\u6B21\u8FD0\u884C\u5DF2\u505C\u7528 \xB7 \u91CD\u542F\u6062\u590D",
+  permanentDisable: "\u6C38\u4E45\u7981\u7528",
+  permanentEnable: "\u89E3\u9664\u6301\u4E45\u7981\u7528",
+  permanentDisableHint: "\u628A disabled: true \u5199\u8FDB home \u5C42 cordis.patch.yml\uFF0C\u91CD\u542F\u540E\u4ECD\u7981\u7528",
+  permanentEnableHint: "\u4ECE home \u5C42 cordis.patch.yml \u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
+  permanentOn: "\u5DF2\u5728 cordis.patch.yml \u6301\u4E45\u7981\u7528\uFF08disabled: true\uFF09\uFF0C\u91CD\u542F\u540E\u4ECD\u751F\u6548 \xB7 \u5BF9\u5168\u90E8 profile \u751F\u6548",
+  permanentDisabledToast: "\u5DF2\u5199\u5165 disabled: true\uFF0C\u91CD\u542F\u540E\u4ECD\u7981\u7528",
+  permanentEnabledToast: "\u5DF2\u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
+  permanentUnchanged: "\u914D\u7F6E\u6587\u4EF6\u5DF2\u662F\u76EE\u6807\u72B6\u6001\uFF0C\u65E0\u9700\u4FEE\u6539",
+  switchLockedByPin: "\u5DF2\u6301\u4E45\u7981\u7528\uFF0C\u5148\u300C\u89E3\u9664\u6301\u4E45\u7981\u7528\u300D\u624D\u80FD\u91CD\u65B0\u542F\u7528",
+  permanentUnavailable: "\u9762\u677F\u65B0\u5EFA\u7684\u6761\u76EE\u4E0D\u5728\u4EFB\u4F55 patch \u6587\u4EF6\u91CC\uFF0C\u91CD\u542F\u5373\u6D88\u5931\uFF0C\u65E0\u6CD5\u6301\u4E45\u7981\u7528",
+  permanentNoEntry: "\u627E\u4E0D\u5230\u8FD9\u4E2A\u6761\u76EE\uFF0C\u5B83\u53EF\u80FD\u5DF2\u7ECF\u4E0D\u5728\u8FD0\u884C\u6811\u91CC",
+  permanentFailed: "\u5199\u5165 cordis.patch.yml \u5931\u8D25\uFF1A{e}",
   edit: "\u7F16\u8F91",
   remove: "\u5220\u9664",
   disableServer: "\u505C\u7528\uFF08\u65AD\u5F00\u5E76\u91CA\u653E context\uFF09",
@@ -272,8 +284,20 @@ var enDict = {
   provider: "provider \xB7 {name}",
   addServer: "\uFF0B Add server",
   hotApplied: "hot-applied, no restart",
-  switchSessionOnly: "switch applies to this run only, reverted after restart (to disable for good, add disabled: true to the entry)",
+  switchSessionOnly: 'switch applies to this run only, reverted after restart (use "Disable for good" on the card to keep it off)',
   switchReverted: "disabled for this run \xB7 restored on restart",
+  permanentDisable: "Disable for good",
+  permanentEnable: "Lift persistent disable",
+  permanentDisableHint: "write disabled: true into the home layer cordis.patch.yml \u2014 stays off after restart",
+  permanentEnableHint: "remove disabled: true from the home layer cordis.patch.yml \u2014 enabled after restart",
+  permanentOn: "pinned disabled: true in cordis.patch.yml \u2014 stays off after restart, for every profile",
+  permanentDisabledToast: "Wrote disabled: true \u2014 stays off after restart",
+  permanentEnabledToast: "Removed disabled: true \u2014 enabled after restart",
+  permanentUnchanged: "config file already in the target state",
+  switchLockedByPin: "persistently disabled \u2014 lift it before re-enabling",
+  permanentUnavailable: "an entry added from the panel is in no patch file and disappears on restart, so it cannot be pinned",
+  permanentNoEntry: "no such entry \u2014 it may no longer be in the running tree",
+  permanentFailed: "failed to write cordis.patch.yml: {e}",
   edit: "Edit",
   remove: "Remove",
   disableServer: "Disable (disconnect & free context)",
@@ -637,6 +661,24 @@ function McpView() {
       }
     );
   };
+  const permanentToggle = (s) => {
+    void rpc("setMcpServerPermanent", { id: s.id, disabled: s.permanentDisabled !== true }).then(
+      (value) => {
+        const changed = value?.changed !== false;
+        load();
+        showToast(
+          !changed ? t("permanentUnchanged") : s.permanentDisabled === true ? t("permanentEnabledToast") : t("permanentDisabledToast")
+        );
+      },
+      (e) => {
+        const code = e instanceof Error ? e.message : String(e);
+        showToast(
+          code === "mcp-permanent-created-this-run" ? t("permanentUnavailable") : code === "mcp-permanent-no-entry" ? t("permanentNoEntry") : t("permanentFailed", { e: code }),
+          "error"
+        );
+      }
+    );
+  };
   const dotCls = (s) => s.fiberPhase === "failed" ? " failed" : s.disabled ? " idle" : "";
   return /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { children: [
     /* @__PURE__ */ (0, import_jsx_runtime.jsxs)("div", { className: "smc-row", style: { marginBottom: 12 }, children: [
@@ -670,16 +712,31 @@ function McpView() {
           {
             type: "button",
             className: `smc-toggle${!s.disabled ? " on" : ""}`,
-            title: s.disabled ? t("enableServer") : t("disableServer"),
+            disabled: s.permanentDisabled === true,
+            title: s.permanentDisabled === true ? t("switchLockedByPin") : s.disabled ? t("enableServer") : t("disableServer"),
             onClick: () => {
               toggle(s);
             },
             "aria-label": s.disabled ? t("enable") : t("disable")
           }
+        ),
+        /* @__PURE__ */ (0, import_jsx_runtime.jsx)(
+          "button",
+          {
+            type: "button",
+            className: `smc-btn${s.permanentDisabled === true ? "" : " danger"}`,
+            disabled: s.createdThisRun === true,
+            title: s.createdThisRun === true ? t("permanentUnavailable") : s.permanentDisabled === true ? t("permanentEnableHint") : t("permanentDisableHint"),
+            onClick: () => {
+              permanentToggle(s);
+            },
+            children: s.permanentDisabled === true ? t("permanentEnable") : t("permanentDisable")
+          }
         )
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: s.transport === "stdio" ? `${s.command ?? ""} ${(s.args ?? []).join(" ")}` : s.url }),
-      s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
+      s.permanentDisabled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("permanentOn") }),
+      s.permanentDisabled !== true && s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
     ] }, s.id))
   ] });
 }

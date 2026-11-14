@@ -51,6 +51,15 @@ export interface McpServer {
      * labelled as session-only.
      */
     sessionToggled: boolean;
+    /**
+     * True when an editable patch layer pins the literal `disabled: true` on this
+     * entry, so the switch survives a restart. Distinct from `sessionToggled`: a
+     * persistently disabled entry must not be labelled "reverted on restart", and
+     * its switch is offered as "lift the persistent disable" instead.
+     */
+    permanentDisabled: boolean;
+    /** True for an entry created from the panel during this run — it is in no patch file yet. */
+    createdThisRun: boolean;
     fiberPhase: string | null;
 }
 /** One tool a server contributes, as the management surface lists it. */
@@ -157,6 +166,13 @@ export declare class SkillMcpService extends Service {
     private readonly officialSkillDirs;
     /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
     private readonly sessionToggled;
+    /**
+     * Ids created from the panel during this run. `createMcpServer` only touches
+     * the in-memory tree, so such an entry is in no patch file: it vanishes on
+     * restart and no patch layer can pin it. Tracked to refuse a persistent
+     * disable with the real reason instead of "not in any writable patch".
+     */
+    private readonly createdThisRun;
     /** Skill names the panel disabled; runtime placeholders shadow the real definitions. */
     private readonly skillsDisabled;
     /** Live disposers for those shadow registrations, keyed by skill name. */
@@ -216,7 +232,11 @@ export declare class SkillMcpService extends Service {
     }>;
     /** Every `mcp-client` loader entry as a server card. */
     listMcpServers(): Promise<McpServer[]>;
-    /** Add one mcp-client entry — hot-connects (create → init) and persists. */
+    /**
+     * Add one mcp-client entry — hot-connects (create → init) in the in-memory
+     * tree. Not persisted: the host's Loader root tree writes are no-ops, so the
+     * entry disappears on restart and lands in no patch file.
+     */
     createMcpServer(config: McpConfig): Promise<{
         id: string;
     }>;
@@ -226,6 +246,70 @@ export declare class SkillMcpService extends Service {
     removeMcpServer(id: string): Promise<void>;
     /** Enable/disable one server without deleting its config. The host does not persist this. */
     setMcpServerEnabled(id: string, enabled: boolean): Promise<void>;
+    /**
+     * The home patch layer: `$DSH_HOME/cordis.patch.yml`. It is applied after
+     * every bundle layer and after the current profile's own layer, so an
+     * id-targeted entry here wins over all of them — and it is outside the tree
+     * `profile-seed` rewrites, unlike a profile's patch file.
+     */
+    private homePatchFile;
+    /** The running profile's patch file, when the host is a `dsh`-launched profile. */
+    private profilePatchFile;
+    /**
+     * The id a patch file stores for a runtime id. The root Include's id is
+     * `include`, so a file row `- id: rea-mcp` is the runtime entry
+     * `include:rea-mcp` (`EntryTree.sep` is `:`); nesting adds one segment each.
+     * Returns every prefix-stripped form, exact id first.
+     */
+    private entryIdCandidates;
+    /** The innermost bare id — what a file row would say if it exists at all. */
+    private bareEntryId;
+    /** The file's own spelling of `id`, preferring a candidate the file actually contains. */
+    private fileIdFor;
+    /**
+     * Every `- id: <id>` row in a patch file, at any nesting depth, with its
+     * block bounds and the line of its `disabled:` field. A block ends at the
+     * next sibling row or at the first line dedented past it. Trailing blank
+     * lines are excluded so a removal does not eat the file's spacing.
+     */
+    private locateIdBlocks;
+    /**
+     * The literal truth value a block pins on `disabled`, or `undefined` when it
+     * pins nothing decidable. `!!js` expressions are evaluated by the Loader at
+     * mount time and cannot be read statically — a real patch layer uses one as a
+     * safety switch, so guessing here would mislabel it.
+     */
+    private literalDisabled;
+    /**
+     * Bare ids pinned `disabled: true` by a layer the running tree actually
+     * loads: the current profile's patch, then the home layer over it. Other
+     * profiles' files are deliberately excluded — the runtime never reads them,
+     * so reporting their state here would mark entries this tree has enabled.
+     */
+    private pinnedDisabledIds;
+    /**
+     * Pin or lift the literal `disabled: true` for one entry in the home patch
+     * layer, then apply the same state to the running tree.
+     *
+     * 面板的开关只能改内存树（宿主把 Loader 根树的 write 做成空实现），所以
+     * 「重启后仍然关」必须落在一个会被加载的 patch 文件里。写 home 层而不是
+     * 当前 profile：它排在所有层之后（later wins），且不受 `profile-seed` 改写。
+     *
+     * 只追加/删除顶格的 `- id:` 覆盖块，从不改动 `insert` 子条目里的任何字段——
+     * 真机上的 `disabled:` 是 `!!js` 条件表达式，就地改写会毁掉那次求值。
+     *
+     * @param id - runtime entry id; `include:` prefixes are stripped for the file.
+     * @param disabled - target state.
+     * @returns the file written, the applied state, and whether the file changed.
+     * @throws `mcp-permanent-created-this-run` when the entry exists only in this
+     * run (created from the panel, so no patch layer can pin it), and
+     * `mcp-permanent-no-entry` when the tree has no such entry.
+     */
+    setMcpPermanentDisabled(id: string, disabled: boolean): Promise<{
+        file: string;
+        disabled: boolean;
+        changed: boolean;
+    }>;
     /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
     private disabledFile;
     /**

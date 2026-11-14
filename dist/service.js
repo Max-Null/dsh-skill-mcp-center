@@ -235,6 +235,13 @@ export class SkillMcpService extends Service {
     officialSkillDirs;
     /** Ids toggled by the panel during this run (in-memory only, by design: the host does not persist it). */
     sessionToggled = new Set();
+    /**
+     * Ids created from the panel during this run. `createMcpServer` only touches
+     * the in-memory tree, so such an entry is in no patch file: it vanishes on
+     * restart and no patch layer can pin it. Tracked to refuse a persistent
+     * disable with the real reason instead of "not in any writable patch".
+     */
+    createdThisRun = new Set();
     /** Skill names the panel disabled; runtime placeholders shadow the real definitions. */
     skillsDisabled = new Set();
     /** Live disposers for those shadow registrations, keyed by skill name. */
@@ -415,6 +422,7 @@ export class SkillMcpService extends Service {
     /** Every `mcp-client` loader entry as a server card. */
     async listMcpServers() {
         const servers = [];
+        const pinned = await this.pinnedDisabledIds();
         for (const entry of this.ctx.loader.entries()) {
             // The official bridge's specifier is the package name, not its internal
             // plugin `name` ('mcp-client'); one entry = one MCP server.
@@ -437,17 +445,24 @@ export class SkillMcpService extends Service {
                 headers: cfg?.headers,
                 disabled: entry.disabled,
                 sessionToggled: this.sessionToggled.has(entry.id),
+                permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => pinned.has(candidate)),
+                createdThisRun: this.createdThisRun.has(entry.id),
                 fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
             });
         }
         return servers;
     }
-    /** Add one mcp-client entry — hot-connects (create → init) and persists. */
+    /**
+     * Add one mcp-client entry — hot-connects (create → init) in the in-memory
+     * tree. Not persisted: the host's Loader root tree writes are no-ops, so the
+     * entry disappears on restart and lands in no patch file.
+     */
     async createMcpServer(config) {
         const id = `mcp-${config.serverName}`;
         // loader.create's runtime ensureId honors an explicit id (cordis.yml rows
         // all carry one), but its d.ts Omit<EntryOptions,'id'> hides that — assert.
         await this.ctx.loader.create({ id, name: '@deepseek-ai/dsh-mcp-client', config: fullMcpConfig(config) });
+        this.createdThisRun.add(id);
         return { id };
     }
     /** Rewrite one server's config — hot-updates the running fiber. */
@@ -457,6 +472,8 @@ export class SkillMcpService extends Service {
     /** Remove one server — disconnects and unregisters its tools. */
     async removeMcpServer(id) {
         await this.ctx.loader.remove(id);
+        this.createdThisRun.delete(id);
+        this.sessionToggled.delete(id);
     }
     /** Enable/disable one server without deleting its config. The host does not persist this. */
     async setMcpServerEnabled(id, enabled) {
@@ -464,6 +481,235 @@ export class SkillMcpService extends Service {
         // 记「本次运行改过」：Loader 根树的 write 是 no-op（loader lib/index.js 的 `write() {}`），
         // 所以这里改的只是内存态；面板据此显示“重启后恢复”，而不是假装它是持久设置。
         this.sessionToggled.add(id);
+    }
+    /**
+     * The home patch layer: `$DSH_HOME/cordis.patch.yml`. It is applied after
+     * every bundle layer and after the current profile's own layer, so an
+     * id-targeted entry here wins over all of them — and it is outside the tree
+     * `profile-seed` rewrites, unlike a profile's patch file.
+     */
+    homePatchFile() {
+        return join(process.env.DSH_HOME ?? join(homedir(), '.dsh'), 'cordis.patch.yml');
+    }
+    /** The running profile's patch file, when the host is a `dsh`-launched profile. */
+    profilePatchFile() {
+        const provided = this.ctx.get('profileContext');
+        return typeof provided?.patchPath === 'string' ? provided.patchPath : null;
+    }
+    /**
+     * The id a patch file stores for a runtime id. The root Include's id is
+     * `include`, so a file row `- id: rea-mcp` is the runtime entry
+     * `include:rea-mcp` (`EntryTree.sep` is `:`); nesting adds one segment each.
+     * Returns every prefix-stripped form, exact id first.
+     */
+    entryIdCandidates(id) {
+        const candidates = [id];
+        let rest = id;
+        while (rest.includes(':')) {
+            rest = rest.slice(rest.indexOf(':') + 1);
+            if (rest !== '')
+                candidates.push(rest);
+        }
+        return candidates;
+    }
+    /** The innermost bare id — what a file row would say if it exists at all. */
+    bareEntryId(id) {
+        return this.entryIdCandidates(id).at(-1) ?? id;
+    }
+    /** The file's own spelling of `id`, preferring a candidate the file actually contains. */
+    fileIdFor(lines, id) {
+        for (const candidate of this.entryIdCandidates(id))
+            if (this.locateIdBlocks(lines, candidate).length > 0)
+                return candidate;
+        return this.bareEntryId(id);
+    }
+    /**
+     * Every `- id: <id>` row in a patch file, at any nesting depth, with its
+     * block bounds and the line of its `disabled:` field. A block ends at the
+     * next sibling row or at the first line dedented past it. Trailing blank
+     * lines are excluded so a removal does not eat the file's spacing.
+     */
+    locateIdBlocks(lines, id) {
+        const escaped = id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const head = new RegExp(`^(\\s*)-\\s*id:\\s*['"]?${escaped}['"]?\\s*(?:#.*)?$`);
+        const blocks = [];
+        for (let start = 0; start < lines.length; start += 1) {
+            const line = lines[start];
+            if (line === undefined)
+                continue;
+            const match = head.exec(line);
+            if (match === null)
+                continue;
+            const indent = (match[1] ?? '').length;
+            let end = start + 1;
+            while (end < lines.length) {
+                const text = lines[end] ?? '';
+                if (text.trim() !== '') {
+                    const own = text.length - text.trimStart().length;
+                    if (own < indent || (own === indent && text.trimStart().startsWith('- ')))
+                        break;
+                }
+                end += 1;
+            }
+            let last = end;
+            while (last > start + 1 && (lines[last - 1] ?? '').trim() === '')
+                last -= 1;
+            let disabledAt = -1;
+            for (let k = start + 1; k < last; k += 1)
+                if (/^\s*disabled:\s*\S/.test(lines[k] ?? '')) {
+                    disabledAt = k;
+                    break;
+                }
+            blocks.push({ start, end: last, indent, disabledAt });
+        }
+        return blocks;
+    }
+    /**
+     * The literal truth value a block pins on `disabled`, or `undefined` when it
+     * pins nothing decidable. `!!js` expressions are evaluated by the Loader at
+     * mount time and cannot be read statically — a real patch layer uses one as a
+     * safety switch, so guessing here would mislabel it.
+     */
+    literalDisabled(lines, block) {
+        if (block.disabledAt < 0)
+            return undefined;
+        const line = lines[block.disabledAt] ?? '';
+        if (/^\s*disabled:\s*true\s*(?:#.*)?$/.test(line))
+            return true;
+        if (/^\s*disabled:\s*false\s*(?:#.*)?$/.test(line))
+            return false;
+        return undefined;
+    }
+    /**
+     * Bare ids pinned `disabled: true` by a layer the running tree actually
+     * loads: the current profile's patch, then the home layer over it. Other
+     * profiles' files are deliberately excluded — the runtime never reads them,
+     * so reporting their state here would mark entries this tree has enabled.
+     */
+    async pinnedDisabledIds() {
+        const files = [this.profilePatchFile(), this.homePatchFile()];
+        const state = new Map();
+        for (const file of files) {
+            if (file === null)
+                continue;
+            const text = await readFile(file, 'utf8').catch(() => null);
+            if (text === null)
+                continue;
+            const lines = text.split(/\r?\n/);
+            const rows = /^\s*-\s*id:\s*['"]?([A-Za-z0-9_.:-]+)['"]?\s*(?:#.*)?$/;
+            for (let i = 0; i < lines.length; i += 1) {
+                const found = rows.exec(lines[i] ?? '')?.[1];
+                if (found === undefined)
+                    continue;
+                // 同文件内同 id 可重复出现；`applyEntryPatches` 的 entryMap 是后者覆盖
+                // 前者，所以最后一个能定值的块才是生效的那个。
+                const block = this.locateIdBlocks(lines, found).at(-1);
+                if (block === undefined)
+                    continue;
+                const value = this.literalDisabled(lines, block);
+                if (value !== undefined)
+                    state.set(found, value);
+            }
+        }
+        const pinned = new Set();
+        for (const [id, value] of state)
+            if (value)
+                pinned.add(id);
+        return pinned;
+    }
+    /**
+     * Pin or lift the literal `disabled: true` for one entry in the home patch
+     * layer, then apply the same state to the running tree.
+     *
+     * 面板的开关只能改内存树（宿主把 Loader 根树的 write 做成空实现），所以
+     * 「重启后仍然关」必须落在一个会被加载的 patch 文件里。写 home 层而不是
+     * 当前 profile：它排在所有层之后（later wins），且不受 `profile-seed` 改写。
+     *
+     * 只追加/删除顶格的 `- id:` 覆盖块，从不改动 `insert` 子条目里的任何字段——
+     * 真机上的 `disabled:` 是 `!!js` 条件表达式，就地改写会毁掉那次求值。
+     *
+     * @param id - runtime entry id; `include:` prefixes are stripped for the file.
+     * @param disabled - target state.
+     * @returns the file written, the applied state, and whether the file changed.
+     * @throws `mcp-permanent-created-this-run` when the entry exists only in this
+     * run (created from the panel, so no patch layer can pin it), and
+     * `mcp-permanent-no-entry` when the tree has no such entry.
+     */
+    async setMcpPermanentDisabled(id, disabled) {
+        if (disabled && this.createdThisRun.has(id))
+            throw new Error('mcp-permanent-created-this-run');
+        // Checking the tree first keeps a bogus id from writing an ownerless
+        // override that the next boot would warn about.
+        let known = false;
+        for (const entry of this.ctx.loader.entries())
+            if (entry.id === id) {
+                known = true;
+                break;
+            }
+        if (!known)
+            throw new Error('mcp-permanent-no-entry');
+        const file = this.homePatchFile();
+        const text = await readFile(file, 'utf8').catch((error) => {
+            if (error.code === 'ENOENT')
+                return null;
+            throw error;
+        });
+        const eol = text !== null && text.includes('\r\n') ? '\r\n' : '\n';
+        const lines = text === null ? [] : text.split(/\r?\n/);
+        const fileId = this.fileIdFor(lines, id);
+        // 写入目标只认顶格覆盖块；`insert` 子条目留给它自己的写法（含 `!!js`）。
+        const target = this.locateIdBlocks(lines, fileId).filter(block => block.indent === 0).at(-1);
+        let changed = true;
+        if (disabled) {
+            if (target === undefined) {
+                let tail = lines.length;
+                while (tail > 0 && (lines[tail - 1] ?? '').trim() === '')
+                    tail -= 1;
+                lines.splice(tail, 0, `- id: ${fileId}`, '  disabled: true');
+            }
+            else if (target.disabledAt < 0) {
+                lines.splice(target.start + 1, 0, '  disabled: true');
+            }
+            else if (this.literalDisabled(lines, target) === true) {
+                changed = false;
+            }
+            else {
+                lines[target.disabledAt] = '  disabled: true';
+            }
+        }
+        else if (target === undefined || target.disabledAt < 0) {
+            changed = false;
+        }
+        else {
+            lines.splice(target.disabledAt, 1);
+            // 覆盖块只剩 `- id:` 一行时整块删掉——孤儿覆盖没有意义。
+            let body = false;
+            for (let k = target.start + 1; k < target.end - 1; k += 1)
+                if ((lines[k] ?? '').trim() !== '') {
+                    body = true;
+                    break;
+                }
+            if (!body)
+                lines.splice(target.start, target.end - 1 - target.start);
+        }
+        if (changed) {
+            const temp = `${file}.${process.pid}.${Date.now()}`;
+            // 新建的文件以换行收尾；已有文件保持它原本的结尾，字节保真优先。
+            const body = text === null && lines.length > 0 ? `${lines.join(eol)}${eol}` : lines.join(eol);
+            try {
+                await mkdir(dirname(file), { recursive: true });
+                await writeFile(temp, body, 'utf8');
+                await rename(temp, file);
+            }
+            catch (error) {
+                await rm(temp, { force: true }).catch(() => { });
+                throw error;
+            }
+        }
+        await this.ctx.loader.update(id, { disabled: disabled ? true : null });
+        // 已不再是「本次运行改过」——重启后它仍是这个状态。
+        this.sessionToggled.delete(id);
+        return { file, disabled, changed };
     }
     /** 技能禁用清单的落盘位置：跟在 DSH_HOME 下，隔离实例各自一份。 */
     disabledFile() {

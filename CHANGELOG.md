@@ -2,6 +2,23 @@
 
 本项目遵循 [Keep a Changelog](https://keepachangelog.com/zh-CN/1.1.0/) 与[语义化版本](https://semver.org/lang/zh-CN/)。
 
+## [Unreleased]
+
+### Added
+
+**MCP 的「永久禁用」按钮**：面板的启停只改内存树（宿主把 Loader 根树的 `write` 做成空实现），重启即恢复；卡片上多一个按钮，把 `disabled: true` 钉进 **home 层** `$DSH_HOME/cordis.patch.yml`，重启后仍然关。再点「解除持久禁用」删掉那两行，恢复启用。
+
+- 写 home 层而不是 profile 层：它在所有 bundle 层与当前 profile 层之后应用（later wins），并且不在 `profile-seed` 的改写范围内——profile 自己的 patch 会被 seed 按模板归属退役掉出厂条目（`apps/desktop/src/ssid/profile-seed.ts` 的 `owned` 判据），而 SSiD 出厂的三个 MCP 条目恰好在 `owned` 里。
+- 只追加/删除顶格的 `- id: <id>` 覆盖块，**从不改动 `insert` 子条目内的任何字段**：真机上的 `disabled:` 是 `!!js` 条件表达式（CLI 缺失即停用，否则整棵插件树加载失败），就地改写会毁掉那次求值，解除时删整行更会让条目永远启用。
+- 按行编辑，保留注释、空行、字段顺序与 CRLF；解除后文件逐字节还原；写入走临时文件 + `rename`，失败清理临时文件。
+- 运行时 id 带 `include:` 前缀（根 Include 的 id 是 `include`），写入时逐层剥到文件里的裸 id；同 id 多次出现时改最后一个（`applyEntryPatches` 的 `entryMap` 是后者覆盖前者）；`- id: x # 注释` 可定位。
+- `McpServer` 新增 `permanentDisabled` 与 `createdThisRun`。持久禁用时普通开关置灰（先解除才能重新启用），配合 0.7.0 的 `sessionToggled` 让三种「关」各自可读。条目来自包内置 patch 同样可钉住；本次运行从面板新建的条目按钮置灰并说明原因。
+- 新增端点 `setMcpServerPermanent` 与 19 条测试。
+
+### Changed
+
+卡片顶部说明从「要长期禁用，给该条目加 `disabled: true`」改为指向新按钮。README 的 MCP 管理条目补上效力边界：增删改与普通开关都只作用于本次运行。
+
 ## [0.7.1] - 2026-11-13
 
 ### Fixed
