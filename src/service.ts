@@ -75,12 +75,19 @@ export interface McpServer {
    */
   sessionToggled: boolean
   /**
-   * True when an editable patch layer pins the literal `disabled: true` on this
-   * entry, so the switch survives a restart. Distinct from `sessionToggled`: a
-   * persistently disabled entry must not be labelled "reverted on restart", and
-   * its switch is offered as "lift the persistent disable" instead.
+   * True when the panel owns this entry's persistent disable — the literal
+   * `disabled: true` sits in a top-level `- id:` override block, which is the
+   * only shape this service writes and therefore the only one it can lift.
+   * Distinct from `pinnedInPatch`: an entry disabled by hand inside an
+   * `insert` child has that field, but lifting it is the user's edit to make.
    */
   permanentDisabled: boolean
+  /**
+   * True when any layer the running tree loads pins the literal
+   * `disabled: true` — top-level override or `insert` child. Says the disable
+   * survives a restart; whether the panel may lift it is `permanentDisabled`.
+   */
+  pinnedInPatch: boolean
   /** True for an entry created from the panel during this run — it is in no patch file yet. */
   createdThisRun: boolean
   fiberPhase: string | null
@@ -531,7 +538,7 @@ export class SkillMcpService extends Service {
   /** Every `mcp-client` loader entry as a server card. */
   async listMcpServers(): Promise<McpServer[]> {
     const servers: McpServer[] = []
-    const pinned = await this.pinnedDisabledIds()
+    const pinned = await this.patchDisableState()
     for (const entry of this.ctx.loader.entries()) {
       // The official bridge's specifier is the package name, not its internal
       // plugin `name` ('mcp-client'); one entry = one MCP server.
@@ -554,7 +561,8 @@ export class SkillMcpService extends Service {
         headers: cfg?.headers,
         disabled: entry.disabled,
         sessionToggled: this.sessionToggled.has(entry.id),
-        permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => pinned.has(candidate)),
+        permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => pinned.get(candidate)?.panelOwned === true),
+        pinnedInPatch: this.entryIdCandidates(entry.id).some(candidate => pinned.get(candidate)?.pinned === true),
         createdThisRun: this.createdThisRun.has(entry.id),
         fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
       })
@@ -693,34 +701,38 @@ export class SkillMcpService extends Service {
   }
 
   /**
-   * Bare ids pinned `disabled: true` by a layer the running tree actually
-   * loads: the current profile's patch, then the home layer over it. Other
-   * profiles' files are deliberately excluded — the runtime never reads them,
-   * so reporting their state here would mark entries this tree has enabled.
+   * Per bare id, what the loaded patch layers say about `disabled`: the last
+   * decidable pin wins (later layers win, and within a file the last matching
+   * block wins — `applyEntryPatches` overwrites `entryMap` in that order), plus
+   * whether that pin sits in a top-level override the panel can rewrite.
+   *
+   * Other profiles' files are deliberately excluded: the runtime never reads
+   * them, so reporting their state here would mark entries this tree has enabled.
    */
-  private async pinnedDisabledIds(): Promise<Set<string>> {
+  private async patchDisableState(): Promise<Map<string, { pinned: boolean, panelOwned: boolean }>> {
     const files = [this.profilePatchFile(), this.homePatchFile()]
-    const state = new Map<string, boolean>()
+    const state = new Map<string, { pinned: boolean, panelOwned: boolean }>()
     for (const file of files) {
       if (file === null) continue
       const text = await readFile(file, 'utf8').catch(() => null)
       if (text === null) continue
       const lines = text.split(/\r?\n/)
-      const rows = /^\s*-\s*id:\s*['"]?([A-Za-z0-9_.:-]+)['"]?\s*(?:#.*)?$/
+      const rows = /^\s*-\s*id:\s*['"]?([A-Za-z0-9_.:\-]+)['"]?\s*(?:#.*)?$/
       for (let i = 0; i < lines.length; i += 1) {
         const found = rows.exec(lines[i] ?? '')?.[1]
         if (found === undefined) continue
-        // 同文件内同 id 可重复出现；`applyEntryPatches` 的 entryMap 是后者覆盖
-        // 前者，所以最后一个能定值的块才是生效的那个。
-        const block = this.locateIdBlocks(lines, found).at(-1)
-        if (block === undefined) continue
-        const value = this.literalDisabled(lines, block)
-        if (value !== undefined) state.set(found, value)
+        const blocks = this.locateIdBlocks(lines, found)
+        // 只认能定值的块：`!!js` 表达式在加载期求值，静态读不出来。
+        let decided: { value: boolean, indent: number } | undefined
+        for (const block of blocks) {
+          const value = this.literalDisabled(lines, block)
+          if (value !== undefined) decided = { value, indent: block.indent }
+        }
+        if (decided === undefined) continue
+        state.set(found, { pinned: decided.value, panelOwned: decided.value && decided.indent === 0 })
       }
     }
-    const pinned = new Set<string>()
-    for (const [id, value] of state) if (value) pinned.add(id)
-    return pinned
+    return state
   }
 
   /**

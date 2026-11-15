@@ -422,7 +422,7 @@ export class SkillMcpService extends Service {
     /** Every `mcp-client` loader entry as a server card. */
     async listMcpServers() {
         const servers = [];
-        const pinned = await this.pinnedDisabledIds();
+        const pinned = await this.patchDisableState();
         for (const entry of this.ctx.loader.entries()) {
             // The official bridge's specifier is the package name, not its internal
             // plugin `name` ('mcp-client'); one entry = one MCP server.
@@ -445,7 +445,8 @@ export class SkillMcpService extends Service {
                 headers: cfg?.headers,
                 disabled: entry.disabled,
                 sessionToggled: this.sessionToggled.has(entry.id),
-                permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => pinned.has(candidate)),
+                permanentDisabled: this.entryIdCandidates(entry.id).some(candidate => pinned.get(candidate)?.panelOwned === true),
+                pinnedInPatch: this.entryIdCandidates(entry.id).some(candidate => pinned.get(candidate)?.pinned === true),
                 createdThisRun: this.createdThisRun.has(entry.id),
                 fiberPhase: entry.fiber === undefined ? null : FIBER_PHASE[entry.fiber.state],
             });
@@ -581,12 +582,15 @@ export class SkillMcpService extends Service {
         return undefined;
     }
     /**
-     * Bare ids pinned `disabled: true` by a layer the running tree actually
-     * loads: the current profile's patch, then the home layer over it. Other
-     * profiles' files are deliberately excluded — the runtime never reads them,
-     * so reporting their state here would mark entries this tree has enabled.
+     * Per bare id, what the loaded patch layers say about `disabled`: the last
+     * decidable pin wins (later layers win, and within a file the last matching
+     * block wins — `applyEntryPatches` overwrites `entryMap` in that order), plus
+     * whether that pin sits in a top-level override the panel can rewrite.
+     *
+     * Other profiles' files are deliberately excluded: the runtime never reads
+     * them, so reporting their state here would mark entries this tree has enabled.
      */
-    async pinnedDisabledIds() {
+    async patchDisableState() {
         const files = [this.profilePatchFile(), this.homePatchFile()];
         const state = new Map();
         for (const file of files) {
@@ -596,26 +600,25 @@ export class SkillMcpService extends Service {
             if (text === null)
                 continue;
             const lines = text.split(/\r?\n/);
-            const rows = /^\s*-\s*id:\s*['"]?([A-Za-z0-9_.:-]+)['"]?\s*(?:#.*)?$/;
+            const rows = /^\s*-\s*id:\s*['"]?([A-Za-z0-9_.:\-]+)['"]?\s*(?:#.*)?$/;
             for (let i = 0; i < lines.length; i += 1) {
                 const found = rows.exec(lines[i] ?? '')?.[1];
                 if (found === undefined)
                     continue;
-                // 同文件内同 id 可重复出现；`applyEntryPatches` 的 entryMap 是后者覆盖
-                // 前者，所以最后一个能定值的块才是生效的那个。
-                const block = this.locateIdBlocks(lines, found).at(-1);
-                if (block === undefined)
+                const blocks = this.locateIdBlocks(lines, found);
+                // 只认能定值的块：`!!js` 表达式在加载期求值，静态读不出来。
+                let decided;
+                for (const block of blocks) {
+                    const value = this.literalDisabled(lines, block);
+                    if (value !== undefined)
+                        decided = { value, indent: block.indent };
+                }
+                if (decided === undefined)
                     continue;
-                const value = this.literalDisabled(lines, block);
-                if (value !== undefined)
-                    state.set(found, value);
+                state.set(found, { pinned: decided.value, panelOwned: decided.value && decided.indent === 0 });
             }
         }
-        const pinned = new Set();
-        for (const [id, value] of state)
-            if (value)
-                pinned.add(id);
-        return pinned;
+        return state;
     }
     /**
      * Pin or lift the literal `disabled: true` for one entry in the home patch

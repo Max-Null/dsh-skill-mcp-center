@@ -211,6 +211,8 @@ var zhDict = {
   permanentDisableHint: "\u628A disabled: true \u5199\u8FDB home \u5C42 cordis.patch.yml\uFF0C\u91CD\u542F\u540E\u4ECD\u7981\u7528",
   permanentEnableHint: "\u4ECE home \u5C42 cordis.patch.yml \u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
   permanentOn: "\u5DF2\u5728 cordis.patch.yml \u6301\u4E45\u7981\u7528\uFF08disabled: true\uFF09\uFF0C\u91CD\u542F\u540E\u4ECD\u751F\u6548 \xB7 \u5BF9\u5168\u90E8 profile \u751F\u6548",
+  pinnedManually: "\u5DF2\u7531 cordis.patch.yml \u624B\u52A8\u7981\u7528\uFF08disabled: true\uFF09\uFF0C\u91CD\u542F\u540E\u4ECD\u751F\u6548 \xB7 \u8981\u91CD\u65B0\u542F\u7528\u8BF7\u76F4\u63A5\u6539\u90A3\u4E2A\u6587\u4EF6",
+  pinnedManuallyHint: "\u8FD9\u6761\u7684 disabled: true \u5199\u5728 cordis.patch.yml \u7684 insert \u6761\u76EE\u91CC\uFF0C\u9762\u677F\u4E0D\u6539\u52A8\u5B83",
   permanentDisabledToast: "\u5DF2\u5199\u5165 disabled: true\uFF0C\u91CD\u542F\u540E\u4ECD\u7981\u7528",
   permanentEnabledToast: "\u5DF2\u79FB\u9664 disabled: true\uFF0C\u91CD\u542F\u540E\u6062\u590D\u542F\u7528",
   permanentUnchanged: "\u914D\u7F6E\u6587\u4EF6\u5DF2\u662F\u76EE\u6807\u72B6\u6001\uFF0C\u65E0\u9700\u4FEE\u6539",
@@ -291,6 +293,8 @@ var enDict = {
   permanentDisableHint: "write disabled: true into the home layer cordis.patch.yml \u2014 stays off after restart",
   permanentEnableHint: "remove disabled: true from the home layer cordis.patch.yml \u2014 enabled after restart",
   permanentOn: "pinned disabled: true in cordis.patch.yml \u2014 stays off after restart, for every profile",
+  pinnedManually: "disabled: true is set by hand in cordis.patch.yml \u2014 stays off after restart; edit that file to re-enable",
+  pinnedManuallyHint: "this entry's disabled: true lives inside an insert child, which the panel never rewrites",
   permanentDisabledToast: "Wrote disabled: true \u2014 stays off after restart",
   permanentEnabledToast: "Removed disabled: true \u2014 enabled after restart",
   permanentUnchanged: "config file already in the target state",
@@ -712,8 +716,8 @@ function McpView() {
           {
             type: "button",
             className: `smc-toggle${!s.disabled ? " on" : ""}`,
-            disabled: s.permanentDisabled === true,
-            title: s.permanentDisabled === true ? t("switchLockedByPin") : s.disabled ? t("enableServer") : t("disableServer"),
+            disabled: s.permanentDisabled === true || s.pinnedInPatch === true,
+            title: s.permanentDisabled === true ? t("switchLockedByPin") : s.pinnedInPatch === true ? t("pinnedManuallyHint") : s.disabled ? t("enableServer") : t("disableServer"),
             onClick: () => {
               toggle(s);
             },
@@ -725,8 +729,8 @@ function McpView() {
           {
             type: "button",
             className: `smc-btn${s.permanentDisabled === true ? "" : " danger"}`,
-            disabled: s.createdThisRun === true,
-            title: s.createdThisRun === true ? t("permanentUnavailable") : s.permanentDisabled === true ? t("permanentEnableHint") : t("permanentDisableHint"),
+            disabled: s.createdThisRun === true || s.pinnedInPatch === true && s.permanentDisabled !== true,
+            title: s.createdThisRun === true ? t("permanentUnavailable") : s.pinnedInPatch === true && s.permanentDisabled !== true ? t("pinnedManuallyHint") : s.permanentDisabled === true ? t("permanentEnableHint") : t("permanentDisableHint"),
             onClick: () => {
               permanentToggle(s);
             },
@@ -736,7 +740,8 @@ function McpView() {
       ] }),
       /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: s.transport === "stdio" ? `${s.command ?? ""} ${(s.args ?? []).join(" ")}` : s.url }),
       s.permanentDisabled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("permanentOn") }),
-      s.permanentDisabled !== true && s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
+      s.permanentDisabled !== true && s.pinnedInPatch === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("pinnedManually") }),
+      s.permanentDisabled !== true && s.pinnedInPatch !== true && s.disabled && s.sessionToggled === true && /* @__PURE__ */ (0, import_jsx_runtime.jsx)("div", { className: "smc-desc", children: t("switchReverted") })
     ] }, s.id))
   ] });
 }

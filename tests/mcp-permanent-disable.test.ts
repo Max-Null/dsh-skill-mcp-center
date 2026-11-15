@@ -220,10 +220,44 @@ describe('MCP 永久禁用：定位', () => {
 })
 
 describe('MCP 永久禁用：状态判定', () => {
-  it('`!!js` 条件表达式不算 permanentDisabled', async () => {
+  it('`!!js` 条件表达式既不算 permanentDisabled 也不算 pinnedInPatch', async () => {
     await writeFile(patch, PATCH, 'utf8')
     const service = makeService()
-    expect((await service.listMcpServers())[0].permanentDisabled).toBe(false)
+    const card = (await service.listMcpServers())[0]
+    expect(card.permanentDisabled).toBe(false)
+    expect(card.pinnedInPatch).toBe(false)
+  })
+
+  it('手写在 insert 里的字面 disabled: true 只算 pinnedInPatch——面板不改它', async () => {
+    // issue #6 作者按 workaround 手写的样子：面板读得出「重启后仍关」，但不能替他解除。
+    const profileDir = join(home, 'profiles', 'desktop')
+    await mkdir(profileDir, { recursive: true })
+    const profilePatch = join(profileDir, 'cordis.patch.yml')
+    const manual = "- insert:\n    - id: rea-mcp\n      disabled: true\n      name: '@deepseek-ai/dsh-mcp-client'\n"
+    await writeFile(profilePatch, manual, 'utf8')
+
+    const service = makeService([mcpEntry('include:rea-mcp', true)], [], profilePatch)
+    const card = (await service.listMcpServers())[0]
+    expect(card.pinnedInPatch).toBe(true)
+    expect(card.permanentDisabled).toBe(false)
+
+    // 解除不会去改 insert 子条目，也不会凭空建 home 层
+    const result = await service.setMcpPermanentDisabled('include:rea-mcp', false)
+    expect(result.changed).toBe(false)
+    expect(await readFile(profilePatch, 'utf8')).toBe(manual)
+    await expect(readFile(join(home, 'cordis.patch.yml'), 'utf8')).rejects.toThrow()
+  })
+
+  it('当前 profile 层顶格的覆盖算 permanentDisabled（面板可解除）', async () => {
+    const profileDir = join(home, 'profiles', 'ssid')
+    await mkdir(profileDir, { recursive: true })
+    const profilePatch = join(profileDir, 'cordis.patch.yml')
+    await writeFile(profilePatch, '- id: rea-mcp\n  disabled: true\n', 'utf8')
+
+    const service = makeService([mcpEntry('include:rea-mcp', true)], [], profilePatch)
+    const card = (await service.listMcpServers())[0]
+    expect(card.permanentDisabled).toBe(true)
+    expect(card.pinnedInPatch).toBe(true)
   })
 
   it('当前 profile 层钉的禁用也能读到', async () => {
@@ -234,7 +268,7 @@ describe('MCP 永久禁用：状态判定', () => {
     await writeFile(patch, PATCH, 'utf8')
 
     const service = makeService([mcpEntry('rea-mcp')], [], profilePatch)
-    expect((await service.listMcpServers())[0].permanentDisabled).toBe(true)
+    expect((await service.listMcpServers())[0].pinnedInPatch).toBe(true)
   })
 
   it('home 层覆盖 profile 层（later wins）', async () => {

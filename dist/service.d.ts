@@ -52,12 +52,19 @@ export interface McpServer {
      */
     sessionToggled: boolean;
     /**
-     * True when an editable patch layer pins the literal `disabled: true` on this
-     * entry, so the switch survives a restart. Distinct from `sessionToggled`: a
-     * persistently disabled entry must not be labelled "reverted on restart", and
-     * its switch is offered as "lift the persistent disable" instead.
+     * True when the panel owns this entry's persistent disable — the literal
+     * `disabled: true` sits in a top-level `- id:` override block, which is the
+     * only shape this service writes and therefore the only one it can lift.
+     * Distinct from `pinnedInPatch`: an entry disabled by hand inside an
+     * `insert` child has that field, but lifting it is the user's edit to make.
      */
     permanentDisabled: boolean;
+    /**
+     * True when any layer the running tree loads pins the literal
+     * `disabled: true` — top-level override or `insert` child. Says the disable
+     * survives a restart; whether the panel may lift it is `permanentDisabled`.
+     */
+    pinnedInPatch: boolean;
     /** True for an entry created from the panel during this run — it is in no patch file yet. */
     createdThisRun: boolean;
     fiberPhase: string | null;
@@ -281,12 +288,15 @@ export declare class SkillMcpService extends Service {
      */
     private literalDisabled;
     /**
-     * Bare ids pinned `disabled: true` by a layer the running tree actually
-     * loads: the current profile's patch, then the home layer over it. Other
-     * profiles' files are deliberately excluded — the runtime never reads them,
-     * so reporting their state here would mark entries this tree has enabled.
+     * Per bare id, what the loaded patch layers say about `disabled`: the last
+     * decidable pin wins (later layers win, and within a file the last matching
+     * block wins — `applyEntryPatches` overwrites `entryMap` in that order), plus
+     * whether that pin sits in a top-level override the panel can rewrite.
+     *
+     * Other profiles' files are deliberately excluded: the runtime never reads
+     * them, so reporting their state here would mark entries this tree has enabled.
      */
-    private pinnedDisabledIds;
+    private patchDisableState;
     /**
      * Pin or lift the literal `disabled: true` for one entry in the home patch
      * layer, then apply the same state to the running tree.

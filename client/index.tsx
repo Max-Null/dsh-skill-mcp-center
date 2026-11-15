@@ -172,6 +172,8 @@ const zhDict: Record<string, string> = {
   permanentDisableHint: '把 disabled: true 写进 home 层 cordis.patch.yml，重启后仍禁用',
   permanentEnableHint: '从 home 层 cordis.patch.yml 移除 disabled: true，重启后恢复启用',
   permanentOn: '已在 cordis.patch.yml 持久禁用（disabled: true），重启后仍生效 · 对全部 profile 生效',
+  pinnedManually: '已由 cordis.patch.yml 手动禁用（disabled: true），重启后仍生效 · 要重新启用请直接改那个文件',
+  pinnedManuallyHint: '这条的 disabled: true 写在 cordis.patch.yml 的 insert 条目里，面板不改动它',
   permanentDisabledToast: '已写入 disabled: true，重启后仍禁用',
   permanentEnabledToast: '已移除 disabled: true，重启后恢复启用',
   permanentUnchanged: '配置文件已是目标状态，无需修改',
@@ -252,6 +254,8 @@ const enDict: Record<string, string> = {
   permanentDisableHint: 'write disabled: true into the home layer cordis.patch.yml — stays off after restart',
   permanentEnableHint: 'remove disabled: true from the home layer cordis.patch.yml — enabled after restart',
   permanentOn: 'pinned disabled: true in cordis.patch.yml — stays off after restart, for every profile',
+  pinnedManually: 'disabled: true is set by hand in cordis.patch.yml — stays off after restart; edit that file to re-enable',
+  pinnedManuallyHint: 'this entry\'s disabled: true lives inside an insert child, which the panel never rewrites',
   permanentDisabledToast: 'Wrote disabled: true — stays off after restart',
   permanentEnabledToast: 'Removed disabled: true — enabled after restart',
   permanentUnchanged: 'config file already in the target state',
@@ -337,8 +341,10 @@ interface McpServer {
   disabled: boolean
   /** 本次运行被面板改过开关——host 侧内存态，重启即清空。 */
   sessionToggled?: boolean
-  /** patch 里钉了字面 disabled: true——重启后仍然关。 */
+  /** patch 的顶格覆盖里钉了字面 disabled: true——面板拥有它，可以解除。 */
   permanentDisabled?: boolean
+  /** 任何可写层里钉了字面 disabled: true（含 insert 子条目）——重启后仍然关，但不归面板管。 */
+  pinnedInPatch?: boolean
   /** 本次运行从面板新建——不在任何 patch 文件里，重启即消失。 */
   createdThisRun?: boolean
   fiberPhase: string | null
@@ -690,19 +696,25 @@ function McpView() {
             <button
               type="button"
               className={`smc-toggle${!s.disabled ? ' on' : ''}`}
-              disabled={s.permanentDisabled === true}
-              title={s.permanentDisabled === true ? t('switchLockedByPin') : s.disabled ? t('enableServer') : t('disableServer')}
+              disabled={s.permanentDisabled === true || s.pinnedInPatch === true}
+              title={
+                s.permanentDisabled === true
+                  ? t('switchLockedByPin')
+                  : s.pinnedInPatch === true ? t('pinnedManuallyHint') : s.disabled ? t('enableServer') : t('disableServer')
+              }
               onClick={() => { toggle(s) }}
               aria-label={s.disabled ? t('enable') : t('disable')}
             />
             <button
               type="button"
               className={`smc-btn${s.permanentDisabled === true ? '' : ' danger'}`}
-              disabled={s.createdThisRun === true}
+              disabled={s.createdThisRun === true || (s.pinnedInPatch === true && s.permanentDisabled !== true)}
               title={
                 s.createdThisRun === true
                   ? t('permanentUnavailable')
-                  : s.permanentDisabled === true ? t('permanentEnableHint') : t('permanentDisableHint')
+                  : s.pinnedInPatch === true && s.permanentDisabled !== true
+                    ? t('pinnedManuallyHint')
+                    : s.permanentDisabled === true ? t('permanentEnableHint') : t('permanentDisableHint')
               }
               onClick={() => { permanentToggle(s) }}
             >
@@ -713,7 +725,10 @@ function McpView() {
           {s.permanentDisabled === true && (
             <div className="smc-desc">{t('permanentOn')}</div>
           )}
-          {s.permanentDisabled !== true && s.disabled && s.sessionToggled === true && (
+          {s.permanentDisabled !== true && s.pinnedInPatch === true && (
+            <div className="smc-desc">{t('pinnedManually')}</div>
+          )}
+          {s.permanentDisabled !== true && s.pinnedInPatch !== true && s.disabled && s.sessionToggled === true && (
             <div className="smc-desc">{t('switchReverted')}</div>
           )}
         </div>
