@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-11-15
+
 ### Added
 
 **MCP 的「永久禁用」按钮**：面板的启停只改内存树（宿主把 Loader 根树的 `write` 做成空实现），重启即恢复；卡片上多一个按钮，把 `disabled: true` 钉进 **home 层** `$DSH_HOME/cordis.patch.yml`，重启后仍然关。再点「解除持久禁用」删掉那两行，恢复启用。
