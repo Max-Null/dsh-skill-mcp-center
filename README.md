@@ -29,7 +29,7 @@ DSH 的 `Loader.write()` 是空实现，面板上的启停只改内存树——�
 
 「永久禁用」把 `disabled: true` 写进 **home 层** `$DSH_HOME/cordis.patch.yml`——这一层在所有 bundle 层与当前 profile 层之后应用，所以覆盖得着它们，且不在 `profile-seed` 改写的范围内（profile 自己的 patch 会被 seed 按模板归属退役掉出厂条目）。写入只追加/删除顶格的 `- id: <id>` 覆盖块，`insert` 子条目里的字段（包括 `disabled: !!js ...` 这种条件表达式）一个字符都不动；解除即删掉那两行，文件逐字节还原。**它对全部 profile 生效**——同一台机器跑两个前端时，在一个里禁用会让另一个也看不到这个 server 的工具。条目若来自插件包内置 patch，同样可用（home 层覆盖得着）；若它是本次运行从面板新建的，按钮置灰——那种条目不在任何 patch 文件里，重启本就消失，先把它写进 `cordis.patch.yml` 再谈持久。
 
-![MCP 开关的效力边界](docs/shots/mcp-switch-session-only.png)
+![MCP 开关的效力边界与「永久禁用」：probe 卡片显示已持久禁用、开关置灰，其余条目可点「永久禁用」](docs/shots/mcp-switch-session-only.png)
 
 ### 设置页：插件技能的启停
 
