@@ -4,6 +4,8 @@
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-20
+
 ### Fixed
 
 **手写在 `insert` 子条目里的 `disabled: true` 不再被当成面板可解除的持久禁用**。0.8.0 读取时把任何可写层里的字面 `disabled: true` 都算作 `permanentDisabled`，而解除只删顶格覆盖块——于是按 issue #6 的 workaround 手写过的条目会显示「解除持久禁用」，点了却提示「配置文件已是目标状态」，条目仍然是禁用的。
