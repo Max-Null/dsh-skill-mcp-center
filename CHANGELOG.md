@@ -4,6 +4,12 @@
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-23
+
+### Fixed
+
+**置灰按钮的说明文案不再把成因限定为 `insert` 子条目**。0.8.2 起「profile 层的顶格覆盖」也走「手动禁用」这条只读分支，但 title 仍写着「写在 cordis.patch.yml 的 insert 条目里」——对 profile 顶格块是错的描述，而 issue #6 报告人机器上的 `ui-schedule` 正是这种。改成「手写在 cordis.patch.yml 里（不在面板管理的那一层）」，两种来源都成立。
+
 ## [0.8.2] - 2026-11-23
 
 ### Fixed
