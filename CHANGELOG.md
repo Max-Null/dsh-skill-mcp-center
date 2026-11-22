@@ -4,6 +4,14 @@
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-23
+
+### Fixed
+
+**profile 层的顶格覆盖不再被当成面板可解除**（issue #6 的 `LingYingNX` 在官方桌面端实测发现）。0.8.1 的 `patchDisableState()` 同时读 profile 与 home 两个文件，却只按「是不是顶格块」判断归属，没记这个块来自哪个文件；而解除只删 **home 层**的块。于是 profile 里手写的 `- id: ui-schedule / disabled: true` 会被报成 `permanentDisabled: true`，面板给它一个「解除持久禁用」按钮，点了返回 `changed: false`、文件一动不动——**正是这个功能要消灭的那种假按钮**。
+
+现在 `panelOwned` 只对 home 层成立：profile 层的顶格覆盖仍算 `pinnedInPatch`（重启后仍然关），但归到只读说明里，面板不去替用户改 profile。
+
 ## [0.8.1] - 2026-11-20
 
 ### Fixed

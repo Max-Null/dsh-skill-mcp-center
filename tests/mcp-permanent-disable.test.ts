@@ -248,16 +248,37 @@ describe('MCP 永久禁用：状态判定', () => {
     await expect(readFile(join(home, 'cordis.patch.yml'), 'utf8')).rejects.toThrow()
   })
 
-  it('当前 profile 层顶格的覆盖算 permanentDisabled（面板可解除）', async () => {
+  it('profile 层的顶格覆盖只算 pinnedInPatch——面板只写 home 层', async () => {
+    // profile 里的 `- id: x / disabled: true` 是持久禁用，但解除只删 home 层的块：
+    // 把它报成面板可解除，会给一个点了没反应的按钮。
     const profileDir = join(home, 'profiles', 'ssid')
     await mkdir(profileDir, { recursive: true })
     const profilePatch = join(profileDir, 'cordis.patch.yml')
-    await writeFile(profilePatch, '- id: rea-mcp\n  disabled: true\n', 'utf8')
+    const manual = '- id: rea-mcp\n  disabled: true\n'
+    await writeFile(profilePatch, manual, 'utf8')
 
     const service = makeService([mcpEntry('include:rea-mcp', true)], [], profilePatch)
     const card = (await service.listMcpServers())[0]
+    expect(card.pinnedInPatch).toBe(true)
+    expect(card.permanentDisabled).toBe(false)
+
+    // 面板不代改 profile，也不凭空建 home 层
+    const result = await service.setMcpPermanentDisabled('include:rea-mcp', false)
+    expect(result.changed).toBe(false)
+    expect(await readFile(profilePatch, 'utf8')).toBe(manual)
+    await expect(readFile(join(home, 'cordis.patch.yml'), 'utf8')).rejects.toThrow()
+  })
+
+  it('home 层的顶格覆盖才是面板可解除的那种', async () => {
+    await writeFile(patch, '- id: rea-mcp\n  disabled: true\n', 'utf8')
+    const service = makeService([mcpEntry('rea-mcp', true)])
+    const card = (await service.listMcpServers())[0]
     expect(card.permanentDisabled).toBe(true)
     expect(card.pinnedInPatch).toBe(true)
+
+    const result = await service.setMcpPermanentDisabled('rea-mcp', false)
+    expect(result.changed).toBe(true)
+    expect(await readFile(patch, 'utf8')).toBe('')
   })
 
   it('当前 profile 层钉的禁用也能读到', async () => {

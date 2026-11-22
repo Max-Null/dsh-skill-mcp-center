@@ -291,7 +291,13 @@ export declare class SkillMcpService extends Service {
      * Per bare id, what the loaded patch layers say about `disabled`: the last
      * decidable pin wins (later layers win, and within a file the last matching
      * block wins — `applyEntryPatches` overwrites `entryMap` in that order), plus
-     * whether that pin sits in a top-level override the panel can rewrite.
+     * whether the panel may lift that pin.
+     *
+     * Only a top-level `- id:` block in the **home layer** is panel-owned, because
+     * that is the one file `setMcpPermanentDisabled` writes. A top-level block in
+     * the current profile is still a persistent disable, but lifting it is the
+     * user's edit: reporting it as panel-owned would offer a button that silently
+     * does nothing, since the lift only looks in the home file.
      *
      * Other profiles' files are deliberately excluded: the runtime never reads
      * them, so reporting their state here would mark entries this tree has enabled.
